@@ -45,6 +45,7 @@
 .status-callout{display:inline-flex;width:max-content;max-width:100%;margin-bottom:9px;padding:6px 9px;border-radius:999px;font-size:10px;font-weight:800;}
 .status-callout.overdue,.route-status.overdue{background:#ffeaec;color:#b9434c;border:1px solid #f5cdd1;}
 .status-callout.upcoming,.route-status.upcoming{background:#eaf5fb;color:#28759b;border:1px solid #d5eaf4;}
+.status-callout.active,.route-status.active{background:#edf8ef;color:#2d7a43;border:1px solid #cfe8d5;}
 .status-callout.unknown{background:#f1f3f5;color:#687786;}
 .route-item.is-overdue{border-color:#f1cdd1;background:#fffafa;}
 .route-item.is-overdue .route-index{background:#ffeaec;color:#b9434c;}
