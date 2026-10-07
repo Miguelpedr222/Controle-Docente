@@ -1,18 +1,18 @@
-const CACHE_NAME = "fiscaliza-docente-v3-pwa-1";
+const CACHE_NAME = "fiscaliza-docente-pwa-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./style.css",
+  "./app.js",
+  "./data.js",
+  "./database.js",
+  "./utils.js",
   "./manifest.webmanifest",
-  "./css/style.css",
-  "./js/app.js",
-  "./js/data.js",
-  "./js/database.js",
-  "./js/utils.js",
-  "./assets/unig-logo.png",
-  "./assets/unig-logo-transparent.png",
-  "./assets/icon-192.png",
-  "./assets/icon-512.png",
-  "./assets/icon-512-maskable.png"
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-512-maskable.png",
+  "./unig-logo.png",
+  "./unig-logo-transparent.png"
 ];
 
 self.addEventListener("install", event => {
@@ -27,9 +27,7 @@ self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       )
     ).then(() => self.clients.claim())
   );
@@ -43,8 +41,10 @@ self.addEventListener("fetch", event => {
       if (cached) return cached;
 
       return fetch(event.request).then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        if (response && response.status === 200 && response.type !== "opaque") {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
         return response;
       }).catch(() => caches.match("./index.html"));
     })

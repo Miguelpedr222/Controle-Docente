@@ -9,17 +9,17 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Fiscaliza Docente">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./assets/icon-192.png" type="image/png">
-  <link rel="apple-touch-icon" href="./assets/icon-192.png">
+  <link rel="icon" href="./icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
   <title>Fiscaliza Docente • UNIG</title>
-  <link rel="stylesheet" href="./css/style.css">
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <div class="app" id="appShell">
     <div class="backdrop" id="backdrop"></div>
     <aside class="sidebar" id="sidebar">
       <div class="brand-card">
-        <div class="brand-logo"><img src="./assets/unig-logo-transparent.png" alt="Universidade Iguaçu"></div>
+        <div class="brand-logo"><img src="./unig-logo-transparent.png" alt="Universidade Iguaçu"></div>
         <div class="brand-name">FISCALIZA DOCENTE</div>
         <div class="brand-sub">Medicina • Nova Iguaçu</div>
       </div>
@@ -90,6 +90,7 @@
       <div class="dialog-actions"><button type="button" class="btn ghost" id="cancelDialog">Cancelar</button><button class="btn primary" type="submit">Salvar fiscalização</button></div>
     </form>
   </dialog>
+
   <dialog id="newClassDialog">
     <form id="newClassForm" class="dialog-card">
       <div class="dialog-head">
@@ -114,11 +115,11 @@
 
   <datalist id="teacherList"></datalist>
 
-  <script type="module" src="./js/app.js"></script>
-<script>
+  <script type="module" src="./app.js"></script>
+  <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js", {scope: "./"})
+        navigator.serviceWorker.register("./sw.js", { scope: "./" })
           .catch(err => console.warn("PWA: service worker não registrado", err));
       });
     }
