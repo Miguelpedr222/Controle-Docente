@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b2746">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Fiscaliza Docente">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="./assets/icon-192.png">
+  <title>Fiscaliza Docente • UNIG</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <div class="app" id="appShell">
+    <div class="backdrop" id="backdrop"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-card">
+        <div class="brand-logo"><img src="./assets/unig-logo-transparent.png" alt="Universidade Iguaçu"></div>
+        <div class="brand-name">FISCALIZA DOCENTE</div>
+        <div class="brand-sub">Medicina • Nova Iguaçu</div>
+      </div>
+
+      <div class="menu-label">VISÃO GERAL</div>
+      <nav class="nav" id="navPrimary">
+        <button data-view="dashboard" class="nav-btn active"><span class="ico">⌂</span><span>Início</span></button>
+        <button data-view="ronda" class="nav-btn"><span class="ico">◉</span><span>Rondas</span><b>Rápido</b></button>
+        <button data-view="escala" class="nav-btn"><span class="ico">▦</span><span>Escala</span></button>
+        <button data-view="historico" class="nav-btn"><span class="ico">◷</span><span>Histórico</span></button>
+      </nav>
+      <div class="menu-label">GESTÃO</div>
+      <nav class="nav" id="navManagement">
+        <button data-view="professores" class="nav-btn"><span class="ico">♙</span><span>Professores</span></button>
+        <button data-view="salas" class="nav-btn"><span class="ico">⌗</span><span>Salas</span></button>
+        <button data-view="relatorios" class="nav-btn"><span class="ico">▤</span><span>Relatórios</span></button>
+        <button data-view="config" class="nav-btn"><span class="ico">⚙</span><span>Configurações</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="local-status"><span></span><div><strong>Modo local</strong><small>Dados neste dispositivo</small></div></div>
+        <div class="sidebar-version">Fiscaliza Docente v2.0</div>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <button class="mobile-menu" id="menuBtn" aria-label="Abrir menu">☰</button>
+        <div class="top-context"><span>UNIG</span><i>•</i><span>MEDICINA</span><i>•</i><span>NOVA IGUAÇU</span></div>
+        <div class="top-right">
+          <div class="live-pill"><span></span> Funcionamento local</div>
+          <div class="today" id="todayText"></div>
+        </div>
+      </header>
+
+      <main class="main" id="view"></main>
+    </section>
+  </div>
+
+  <nav class="bottom-nav" id="bottomNav">
+    <button data-view="dashboard"><span>⌂</span><small>Início</small></button>
+    <button data-view="ronda"><span>◉</span><small>Ronda</small></button>
+    <button data-view="escala"><span>▦</span><small>Escala</small></button>
+    <button data-view="historico"><span>◷</span><small>Histórico</small></button>
+    <button id="moreBtn"><span>•••</span><small>Mais</small></button>
+  </nav>
+
+  <div class="toast-host" id="toastHost"></div>
+
+  <dialog id="inspectionDialog">
+    <form id="inspectionForm" class="dialog-card">
+      <div class="dialog-head">
+        <div><small>REGISTRO DE RONDA</small><h2>Fiscalizar aula</h2></div>
+        <button type="button" class="close-btn" id="closeDialog">×</button>
+      </div>
+      <div id="dialogSchedule" class="dialog-summary"></div>
+      <input type="hidden" id="inspectionId">
+      <div class="field-grid">
+        <label>Situação<select id="fStatus" required>
+          <option value="">Selecione</option><option>Presente</option><option>Substituição</option><option>Atraso</option><option>Falta</option><option>Justificada</option><option>Turmas Unificadas</option><option>Aula cancelada</option><option>Professor não localizado</option><option>Outro</option>
+        </select></label>
+        <label>Professor presente<input id="fTeacher" list="teacherList" placeholder="Quem foi encontrado?"></label>
+        <label>Sala presente<input id="fRoom" placeholder="Ex.: K-507"></label>
+        <label>Horário fiscalizado<input id="fChecked" type="time"></label>
+        <label>Início real<input id="fStart" type="time"></label>
+        <label>Término real<input id="fEnd" type="time"></label>
+        <label class="full">Observações<textarea id="fNotes" rows="4" placeholder="Registre substituição, turma unificada, sala alterada, professor ausente etc."></textarea></label>
+      </div>
+      <div class="dialog-actions"><button type="button" class="btn ghost" id="cancelDialog">Cancelar</button><button class="btn primary" type="submit">Salvar fiscalização</button></div>
+    </form>
+  </dialog>
+  <dialog id="newClassDialog">
+    <form id="newClassForm" class="dialog-card">
+      <div class="dialog-head">
+        <div><small>CADASTRO DE ESCALA</small><h2>Nova aula</h2></div>
+        <button type="button" class="close-btn" id="closeClassDialog">×</button>
+      </div>
+      <p class="muted" style="margin-top:0">Adicione uma aula que não esteja na escala. Você pode vincular um ou vários professores escalados.</p>
+      <div class="field-grid">
+        <label>Data<input id="newClassDate" type="date" required></label>
+        <label>Período<input id="newClassPeriod" placeholder="Ex.: 3º período" required></label>
+        <label>Início<input id="newClassStart" type="time" required></label>
+        <label>Término<input id="newClassEnd" type="time" required></label>
+        <label class="full">Sala<input id="newClassRoom" placeholder="Ex.: Bloco K – 507" required></label>
+        <label class="full">Disciplina<input id="newClassSubject" placeholder="Nome da disciplina / carga horária" required></label>
+        <label class="full">Professores escalados</label>
+        <div class="teacher-picker full" id="newClassTeachers"></div>
+        <label class="full">Observações<textarea id="newClassNotes" rows="3" placeholder="Opcional"></textarea></label>
+      </div>
+      <div class="dialog-actions"><button type="button" class="btn ghost" id="cancelClassDialog">Cancelar</button><button class="btn primary" type="submit">Adicionar à escala</button></div>
+    </form>
+  </dialog>
+
+  <datalist id="teacherList"></datalist>
+
+  <script type="module" src="./js/app.js"></script>
+<script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js", {scope: "./"})
+          .catch(err => console.warn("PWA: service worker não registrado", err));
+      });
+    }
+  </script>
+</body>
+</html>
