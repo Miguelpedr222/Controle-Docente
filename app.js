@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     await syncInspectionTeacherNames();
     await reload();
     await migrateLegacyRoomChecks();
+    await cleanupDuplicateData();
     await reload();
     render();
   }catch(err){console.error(err);showError(err.message||'Falha ao iniciar o aplicativo.');}
@@ -64,6 +65,89 @@ function closeMenu(){$('#sidebar').classList.remove('open');$('#backdrop').class
 function navigate(view){if(!titles[view])view='dashboard';state.view=view;closeMenu();$$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===view));$$('.bottom-nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));render();window.scrollTo({top:0,behavior:'smooth'})}
 async function reload(){state.schedule=await db.getAll('schedule');state.inspections=await db.getAll('inspections');state.settings=await db.get('settings','app')||{};state.rounds=loadRounds();populateTeachers()}
 async function migrateLegacyRoomChecks(){const inspections=await db.getAll('inspections');const schedules=await db.getAll('schedule');for(const x of schedules){let checks=normalizeRoomChecks(x);const rel=inspections.filter(i=>String(i.scheduleId||'')===String(x.id));for(const c of checks){const hit=rel.find(i=>String(i.plannedRoom||i.presentRoom||'').trim()===String(c.room).trim())||rel.find(i=>String(i.plannedRoom||'').toLowerCase().includes(String(c.room).toLowerCase()));if(hit){c.done=true;c.status=hit.status||c.status;c.presentTeacher=hit.presentTeacher||c.presentTeacher;c.presentRoom=hit.presentRoom||c.presentRoom||c.room;c.checkedTime=hit.checkedTime||c.checkedTime;c.realStart=(hit.realTime||'').split('/')[0]||c.realStart;c.realEnd=(hit.realTime||'').split('/')[1]||c.realEnd;c.notes=hit.notes||c.notes;c.followUpPending=!!hit.followUpPending;c.initialStatus=hit.initialStatus||c.initialStatus;c.initialCheckedTime=hit.initialCheckedTime||c.initialCheckedTime;c.initialNotes=hit.initialNotes||c.initialNotes;c.followUpCheckedTime=hit.followUpCheckedTime||c.followUpCheckedTime;c.followUpTeacher=hit.followUpTeacher||c.followUpTeacher;c.followUpNotes=hit.followUpNotes||c.followUpNotes;}}const complete=checks.every(c=>c.done);const next={...x,roomChecks:checks,recordStatus:complete?'Fiscalizado':'Pendente',status:complete?(checks.map(c=>c.status).filter(Boolean).length?(new Set(checks.map(c=>c.status).filter(Boolean)).size===1?checks.find(c=>c.status)?.status:'Fiscalização concluída'):null):null,followUpPending:checks.some(c=>c.followUpPending)};await db.put('schedule',next)}}
+async function cleanupDuplicateData(){
+  // Limpeza idempotente: pode rodar novamente sem apagar registros legítimos.
+  const schedules=await db.getAll('schedule');
+  const inspections=await db.getAll('inspections');
+  const deletedRec=await db.get('settings','deletedScheduleIds')||{key:'deletedScheduleIds',ids:[]};
+  const deleted=new Set(deletedRec.ids||[]);
+  const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase().replace(/[–—−]/g,'-').replace(/\s+/g,' ');
+  const canonRoom=v=>splitRooms(v).map(norm).sort().join(' + ');
+  const canonSubject=v=>String(v??'').split(/\n+/).map(norm).filter(Boolean).sort().join(' / ');
+  const scheduleKey=x=>[norm(x.date),norm(x.start),norm(x.end),norm(x.period),canonRoom(x.room),norm(canonicalTeacher(x.scheduledTeacher)),canonSubject(x.subject)].join('|');
+  const score=x=>{
+    const checks=Array.isArray(x.roomChecks)?x.roomChecks:[];
+    return (x.status?4:0)+(x.recordStatus==='Fiscalizado'?3:0)+(checks.filter(c=>c.done).length*2)+(x.followUpPending?2:0)+(x.notes?1:0)+(x.presentTeacher?1:0)+(x.updatedAt?1:0);
+  };
+  const groups=new Map();
+  for(const x of schedules){
+    if(deleted.has(x.id)) continue;
+    const key=scheduleKey(x);
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push(x);
+  }
+  const removedScheduleIds=new Set();
+  for(const group of groups.values()){
+    if(group.length<2) continue;
+    group.sort((a,b)=>score(b)-score(a) || String(a.updatedAt||a.createdAt||'').localeCompare(String(b.updatedAt||b.createdAt||'')) || String(a.id).localeCompare(String(b.id)));
+    const keep=group[0];
+    const drops=group.slice(1);
+    // Junta o nível de sala do duplicado ao registro que será mantido.
+    let mergedChecks=normalizeRoomChecks(keep);
+    for(const drop of drops){
+      const dc=normalizeRoomChecks(drop);
+      for(const d of dc){
+        const idx=mergedChecks.findIndex(c=>norm(c.room)===norm(d.room));
+        if(idx>=0 && (!mergedChecks[idx].done || d.followUpPending)){
+          if(d.done) mergedChecks[idx]={...mergedChecks[idx],...d,room:mergedChecks[idx].room};
+        }
+      }
+      const related=inspections.filter(i=>String(i.scheduleId)===String(drop.id));
+      for(const i of related){
+        const room=norm(i.presentRoom||i.plannedRoom);
+        const already=inspections.some(j=>String(j.scheduleId)===String(keep.id) && norm(j.presentRoom||j.plannedRoom)===room && norm(j.status)===norm(i.status) && norm(j.checkedTime)===norm(i.checkedTime) && norm(j.notes)===norm(i.notes));
+        if(!already) await db.put('inspections',{...i,scheduleId:keep.id});
+        if(i.id!=null) await db.remove('inspections',i.id);
+      }
+      removedScheduleIds.add(drop.id);
+      await db.remove('schedule',drop.id);
+    }
+    const complete=mergedChecks.length>0 && mergedChecks.every(c=>c.done);
+    await db.put('schedule',{...keep,roomChecks:mergedChecks,recordStatus:complete?'Fiscalizado':'Pendente',status:complete?roomStatusSummary({...keep,roomChecks:mergedChecks}):null,followUpPending:mergedChecks.some(c=>c.followUpPending)});
+  }
+
+  // Limpa histórico duplicado por conteúdo real. scheduleId não participa da chave,
+  // pois cópias da mesma fiscalização podem estar ligadas a IDs de ronda diferentes.
+  const current=await db.getAll('inspections');
+  const seen=new Map();
+  for(const i of current){
+    const key=[norm(i.date),norm(i.scheduledTeacher||i.assignedName),norm(i.presentTeacher),canonRoom(i.presentRoom||i.plannedRoom),norm(i.status),norm(i.checkedTime),norm(i.realTime),norm(i.notes),norm(i.followUpCheckedTime),norm(i.followUpTeacher),norm(i.followUpNotes)].join('|');
+    const old=seen.get(key);
+    if(!old){seen.set(key,i);continue;}
+    const keep=String(i.updatedAt||i.createdAt||'')>String(old.updatedAt||old.createdAt||'')?i:old;
+    const drop=keep===i?old:i;
+    seen.set(key,keep);
+    if(drop.id!=null) await db.remove('inspections',drop.id);
+  }
+  if(removedScheduleIds.size || deleted.size) await db.put('settings',{key:'deletedScheduleIds',ids:[...new Set([...deleted,...removedScheduleIds])]});
+  await db.put('settings',{key:'duplicateCleanupVersion',version:2,ranAt:new Date().toISOString()});
+}
+
+async function deleteRound(id){
+  const x=state.schedule.find(r=>String(r.id)===String(id));
+  if(!x){toast('Ronda não encontrada.','error');return;}
+  const label=`${fmtDate(x.date)} • ${x.start||'--:--'} • ${x.room||'sala não definida'} • ${x.scheduledTeacher||'professor não informado'}`;
+  if(!confirm(`Excluir definitivamente esta ronda?\n\n${label}\n\nA ronda será removida da escala e os registros de histórico ligados a ela também serão removidos. Essa ação não pode ser desfeita sem um backup.`))return;
+  const rec=await db.get('settings','deletedScheduleIds')||{key:'deletedScheduleIds',ids:[]};
+  const ids=new Set(rec.ids||[]);ids.add(x.id);
+  const related=await db.getAll('inspections');
+  for(const i of related.filter(i=>String(i.scheduleId)===String(x.id))) if(i.id!=null) await db.remove('inspections',i.id);
+  await db.remove('schedule',x.id);
+  await db.put('settings',{key:'deletedScheduleIds',ids:[...ids]});
+  state.skippedRounds=state.skippedRounds.filter(k=>k!==roundKey(x));saveSkippedRounds();
+  await reload();render();toast('Ronda excluída. Ela não voltará pela sincronização da escala.');
+}
+
 function canonicalTeacher(name){if(!name)return name;return TEACHER_ALIASES[name]||name;}
 async function syncInspectionTeacherNames(){const inspections=await db.getAll('inspections');const writes=[];for(const old of inspections){const next={...old};const a=canonicalTeacher(old.scheduledTeacher);const b=canonicalTeacher(old.presentTeacher);const c=canonicalTeacher(old.assignedName);if(a!==old.scheduledTeacher||b!==old.presentTeacher||c!==old.assignedName){if(old.scheduledTeacher!=null)next.scheduledTeacher=a;if(old.presentTeacher!=null)next.presentTeacher=b;if(old.assignedName!=null)next.assignedName=c;writes.push(next);}}if(writes.length)await db.bulkPut('inspections',writes)}
 function splitRooms(room){const raw=String(room||'').split(/\s+e\s+/i).map(v=>v.trim()).filter(Boolean);if(raw.length<=1)return raw.length?raw:['Sala não definida'];const first=raw[0];const m=first.match(/^(.*?)(\d+[A-Za-z]?)$/);const prefix=m?m[1]:'';return raw.map((part,i)=>i===0?part:(/^\d/.test(part)&&prefix?prefix+part:part));}
@@ -166,7 +250,7 @@ function ronda(){
   const completedRooms=rows.flatMap(x=>roomProgress(x).checks.filter(c=>c.done).map(c=>({x,c})));
   const completedHtml=completedRooms.length?`<section class="card panel completed-rounds"><div class="panel-head"><div><h2>Já fiscalizadas</h2><span class="muted">Cada sala aparece aqui assim que for conferida.</span></div><strong>${completedRooms.length} sala(s)</strong></div><div class="route-list">${completedRooms.map(({x,c})=>`<article class="route-item"><div class="route-index">✓</div><div class="route-info"><strong>${esc(c.room)}</strong><span>${esc(x.start||'--:--')} — ${esc(x.end||'--:--')} • ${esc(x.scheduledTeacher||'Professor não informado')}</span><small>${esc(c.status||'Fiscalizado')}${c.followUpPending?' • retorno necessário':''}${c.presentTeacher?' • '+esc(c.presentTeacher):''}</small></div><button class="btn ghost small" data-inspect="${esc(x.id)}" data-inspect-mode="${c.followUpPending?'followup':'normal'}" data-inspect-room="${esc(c.room)}">${c.followUpPending?'Verificar chegada':'Abrir'}</button></article>`).join('')}</div></section>`:`<section class="card panel"><div class="empty"><strong>Nenhuma sala fiscalizada ainda.</strong><p>As salas concluídas aparecerão aqui após o registro.</p></div></section>`;
   const callout=currentTiming?.key==='overdue'?'⚠ Ronda atrasada — mais de 10 min':currentTiming?.key==='live'?'✓ Horário da aula — faça a ronda agora':'✓ Próxima aula pendente';
-  return `${pageHead('Rondas','Cada sala é controlada separadamente. A aula só sai da fila quando todas as salas forem fiscalizadas.',`<span class="device-clock compact">Agora: <strong>${nowText}</strong></span><input class="control" type="date" id="rondaDate" value="${state.date}"><button class="btn ghost" data-new-class>+ Nova aula</button><button class="btn primary" data-next-ronda>Próxima</button>`)}${selectedToday?`<div class="ronda-live card"><div><strong>Horário do dispositivo</strong><span>${nowText}</span></div><div><strong>${overdueCount}</strong><span>ronda(s) atrasada(s)</span></div><div><strong>${orderedGroups.length}</strong><span>ronda(s) pendente(s)</span></div></div>`:''}<div class="ronda-summary"><div><strong>${pending.length}</strong><span>rondas pendentes</span></div><div><strong>${completed}</strong><span>salas/rondas completas</span></div><div><strong>${rows.length}</strong><span>registros no dia</span></div></div>${followUpHtml}${skippedHtml}${current?`<section class="next-focus card ${currentTiming.key==='overdue'?'is-overdue':''}"><div class="next-round-label">${currentTiming.label}</div><div class="next-focus-grid"><div><span class="status-callout ${currentTiming.className}">${callout}</span><span class="muted">${esc(current.start||'--:--')} — ${esc(current.end||'--:--')}</span><h2>${esc(current.room||'Sala não definida')}</h2><p>${esc((current.subject||'').replace(/\n/g,' • '))}</p><div class="teacher-stack"><span>${esc(current.scheduledTeacher||'Professor não informado')}</span></div><div class="room-check-list">${roomProgress(current).checks.map(c=>roomCardLine(current,c)).join('')}</div></div><div style="display:flex;flex-direction:column;gap:8px;align-items:stretch"><button class="btn ghost small" data-skip-ronda>Passar para próxima ronda</button></div></div></section>`:''}${orderedGroups.length>1?`<div class="section-caption"><strong>${overdueGroups.length>0?'Fila de rondas':'Próximas salas'}</strong><span>${selectedToday?'Ordenadas pelo horário do dispositivo':'Em ordem de horário'}</span></div><div class="route-list">${orderedGroups.slice(1).map((group,i)=>{const x=group[0],t=rondaTiming(x),p=roomProgress(x);return `<article class="route-item ${t.key==='overdue'?'is-overdue':''}"><div class="route-index">${i+2}</div><div class="route-info"><strong>${esc(x.room||'Sala não definida')}</strong><span>${esc(x.start||'--:--')} — ${esc(x.end||'--:--')} • ${esc(x.period||'')}</span><small>${p.done}/${p.total} sala(s) fiscalizada(s)${p.followUps.length?' • '+p.followUps.length+' retorno(s)':''}</small></div><span class="route-status ${t.className}">${t.label}</span><button class="btn ghost small" data-inspect="${esc(x.id)}">Abrir</button></article>`}).join('')}</div>`:`<div class="card empty"><strong>${rows.length?'Nenhuma outra ronda na fila.':'Nenhuma aula encontrada nesta data.'}</strong><p>${rows.length?'As rondas adiadas ficam disponíveis para reabertura. Os retornos continuam no bloco “Retornos necessários”.':'Selecione outra data ou cadastre uma nova aula.'}</p></div>`}}`+completedHtml;
+  return `${pageHead('Rondas','Cada sala é controlada separadamente. A aula só sai da fila quando todas as salas forem fiscalizadas.',`<span class="device-clock compact">Agora: <strong>${nowText}</strong></span><input class="control" type="date" id="rondaDate" value="${state.date}"><button class="btn ghost" data-new-class>+ Nova aula</button><button class="btn primary" data-next-ronda>Próxima</button>`)}${selectedToday?`<div class="ronda-live card"><div><strong>Horário do dispositivo</strong><span>${nowText}</span></div><div><strong>${overdueCount}</strong><span>ronda(s) atrasada(s)</span></div><div><strong>${orderedGroups.length}</strong><span>ronda(s) pendente(s)</span></div></div>`:''}<div class="ronda-summary"><div><strong>${pending.length}</strong><span>rondas pendentes</span></div><div><strong>${completed}</strong><span>salas/rondas completas</span></div><div><strong>${rows.length}</strong><span>registros no dia</span></div></div>${followUpHtml}${skippedHtml}${current?`<section class="next-focus card ${currentTiming.key==='overdue'?'is-overdue':''}"><div class="next-round-label">${currentTiming.label}</div><div class="next-focus-grid"><div><span class="status-callout ${currentTiming.className}">${callout}</span><span class="muted">${esc(current.start||'--:--')} — ${esc(current.end||'--:--')}</span><h2>${esc(current.room||'Sala não definida')}</h2><p>${esc((current.subject||'').replace(/\n/g,' • '))}</p><div class="teacher-stack"><span>${esc(current.scheduledTeacher||'Professor não informado')}</span></div><div class="room-check-list">${roomProgress(current).checks.map(c=>roomCardLine(current,c)).join('')}</div></div><div style="display:flex;flex-direction:column;gap:8px;align-items:stretch"><button class="btn ghost small" data-skip-ronda>Passar para próxima ronda</button><button class="btn ghost small" data-delete-round="${esc(current.id)}">Excluir ronda</button></div></div></section>`:''}${orderedGroups.length>1?`<div class="section-caption"><strong>${overdueGroups.length>0?'Fila de rondas':'Próximas salas'}</strong><span>${selectedToday?'Ordenadas pelo horário do dispositivo':'Em ordem de horário'}</span></div><div class="route-list">${orderedGroups.slice(1).map((group,i)=>{const x=group[0],t=rondaTiming(x),p=roomProgress(x);return `<article class="route-item ${t.key==='overdue'?'is-overdue':''}"><div class="route-index">${i+2}</div><div class="route-info"><strong>${esc(x.room||'Sala não definida')}</strong><span>${esc(x.start||'--:--')} — ${esc(x.end||'--:--')} • ${esc(x.period||'')}</span><small>${p.done}/${p.total} sala(s) fiscalizada(s)${p.followUps.length?' • '+p.followUps.length+' retorno(s)':''}</small></div><span class="route-status ${t.className}">${t.label}</span><div style="display:flex;gap:6px"><button class="btn ghost small" data-inspect="${esc(x.id)}">Abrir</button><button class="btn ghost small" data-delete-round="${esc(x.id)}">Excluir</button></div></article>`}).join('')}</div>`:`<div class="card empty"><strong>${rows.length?'Nenhuma outra ronda na fila.':'Nenhuma aula encontrada nesta data.'}</strong><p>${rows.length?'As rondas adiadas ficam disponíveis para reabertura. Os retornos continuam no bloco “Retornos necessários”.':'Selecione outra data ou cadastre uma nova aula.'}</p></div>`}}`+completedHtml;
 }
 function escala(){
   let rows=[...state.schedule];
@@ -177,17 +261,18 @@ function escala(){
 }
 function historyRows(){
   const merged=[
-    ...state.schedule.filter(x=>x.status).map(x=>({date:x.date,scheduledTeacher:x.scheduledTeacher,presentTeacher:x.presentTeacher,plannedRoom:x.room,presentRoom:x.presentRoom,status:x.status,notes:x.notes,createdAt:x.createdAt||x.date+'T00:00:00',source:'Escala',scheduleId:x.id})),
+    ...state.schedule.filter(x=>x.status).map(x=>({date:x.date,scheduledTeacher:x.scheduledTeacher,presentTeacher:x.presentTeacher,plannedRoom:x.room,presentRoom:x.presentRoom,status:x.status,notes:x.notes,createdAt:x.createdAt||x.date+'T00:00:00',source:'Escala',scheduleId:x.id,inspectionId:null,period:x.period,subject:x.subject})),
     ...state.inspections.map(x=>({...x,source:x.source||'Histórico'}))
   ];
-  const seen=new Set();
-  return merged.filter(x=>{
-    const key=[x.date,x.scheduledTeacher||x.assignedName,x.presentTeacher,x.presentRoom||x.plannedRoom,x.status,x.notes].map(v=>String(v||'').trim()).join('|');
-    if(seen.has(key)) return false;
-    seen.add(key); return true;
-  }).filter(x=>!state.historyMonth || String(x.date||'').startsWith(state.historyMonth)).filter(x=>!state.historyStatus || x.status===state.historyStatus).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const seen=new Map();
+  for(const x of merged){
+    const key=[String(x.date||''),canonicalTeacher(x.scheduledTeacher||x.assignedName),String(x.presentTeacher||''),splitRooms(x.presentRoom||x.plannedRoom).map(v=>v.trim().toLowerCase()).sort().join('|'),String(x.status||''),String(x.checkedTime||''),String(x.realTime||''),String(x.notes||'')].join('¦');
+    const old=seen.get(key);
+    if(!old || String(x.source)==='Histórico') seen.set(key,x);
+  }
+  return [...seen.values()].filter(x=>!state.historyMonth || String(x.date||'').startsWith(state.historyMonth)).filter(x=>!state.historyStatus || x.status===state.historyStatus).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
 }
-function historico(){const rows=historyRows();const statuses=unique(state.schedule.map(x=>x.status).concat(state.inspections.map(x=>x.status)));return `${pageHead('Histórico','Consulta registros da escala que já foram fiscalizados e as observações históricas importadas.',`<input class="control" type="month" id="historyMonth" value="${state.historyMonth}"><select class="control" id="historyStatus"><option value="">Todas as situações</option>${statuses.map(s=>`<option value="${esc(s)}" ${state.historyStatus===s?'selected':''}>${esc(s)}</option>`).join('')}</select><button class="btn ghost" data-new-class>+ Nova aula</button><button class="btn ghost" id="exportHistory">Exportar CSV</button>`)}<div class="metrics">${metric('Encontrados',rows.length,'no filtro atual')}${metric('Rondas',state.rounds.length,'sessões registradas')}${metric('Outubro',historyRowsForMonth('2026-10').length,'registros fiscalizados/importados')}</div><div class="table-wrap"><table class="data-table"><thead><tr><th>Data</th><th>Professor escalado</th><th>Professor presente</th><th>Situação</th><th>Sala</th><th>Observação</th><th>Ações</th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td>${esc(fmtDate(x.date))}</td><td>${esc(x.scheduledTeacher||x.assignedName||'—')}</td><td>${esc(x.presentTeacher||'—')}</td><td>${badge(x.status)}</td><td>${esc(x.presentRoom||x.plannedRoom||'—')}</td><td>${esc(x.notes||'—')}</td><td><div style="display:flex;gap:6px"><button class="btn ghost small" data-edit-history="${esc(x.scheduleId||x.id||'')}">Editar</button><button class="btn ghost small" data-delete-history="${esc(x.scheduleId||x.id||'')}">Excluir</button></div></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty"><strong>Nenhum registro encontrado.</strong><p>Altere o mês ou a situação para consultar outra parte da base.</p></div></td></tr>`}</tbody></table></div>`}
+
 function historyRowsForMonth(month){return historyRowsWithoutFilter(month)}
 function historyRowsWithoutFilter(month){const merged=[...state.schedule.filter(x=>x.status).map(x=>({date:x.date,scheduledTeacher:x.scheduledTeacher,presentTeacher:x.presentTeacher,plannedRoom:x.room,presentRoom:x.presentRoom,status:x.status,notes:x.notes,createdAt:x.createdAt||x.date+'T00:00:00',scheduleId:x.id})),...state.inspections.map(x=>({...x}))];const seen=new Set();return merged.filter(x=>{const key=[x.date,x.scheduledTeacher||x.assignedName,x.presentTeacher,x.presentRoom||x.plannedRoom,x.status,x.notes].map(v=>String(v||'').trim()).join('|');if(seen.has(key))return false;seen.add(key);return true;}).filter(x=>String(x.date||'').startsWith(month));}
 function professores(){
@@ -198,12 +283,12 @@ function professores(){
 }
 function salas(){const rooms=unique(state.schedule.map(x=>x.room));return `${pageHead('Salas','Mapa operacional das salas que aparecem na escala docente.') }<div class="room-grid">${rooms.map(r=>{const count=state.schedule.filter(x=>x.room===r).length;return `<article class="room-card"><div class="room-name">${esc(r)}</div><div class="room-subject">${count} registros na base</div><span class="badge other">Bloco K • Medicina</span></article>`}).join('')}</div>`}
 function relatorios(){const month=state.date.slice(0,7);const rows=state.schedule.filter(x=>String(x.date||'').startsWith(month));const occurrences=rows.filter(x=>x.status&&x.status!=='Presente');const teachers=unique(occurrences.map(x=>x.scheduledTeacher||x.presentTeacher));const counts=occurrences.reduce((m,x)=>{m[x.status]=(m[x.status]||0)+1;return m},{});return `${pageHead('Relatório mensal','Relatório objetivo: somente ocorrências diferentes de Presente.',`<input class="control" type="month" id="reportMonth" value="${month}"><button class="btn primary" id="generatePdf">Gerar PDF</button><button class="btn ghost" id="exportCsv">Exportar CSV</button>`)}<div class="report-layout"><section class="card panel"><div class="panel-head"><h2>Resumo do mês</h2></div><div class="kpi"><span>Total de ocorrências</span><strong>${occurrences.length}</strong></div><div class="kpi"><span>Professores com ocorrência</span><strong>${teachers.length}</strong></div>${Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<div class="kpi"><span>${esc(n)}</span><strong>${v}</strong></div>`).join('')||'<div class="empty">Nenhuma ocorrência no período selecionado.</div>'}</section><section class="card panel"><div class="panel-head"><h2>Prévia das ocorrências</h2><span class="muted">${fmtMonth(month)}</span></div>${occurrences.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Professor</th><th>Turma</th><th>Sala</th><th>Ocorrência</th><th>Observação</th></tr></thead><tbody>${occurrences.slice(0,50).map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.scheduledTeacher||x.presentTeacher||'—')}</td><td>${esc(x.period||'—')}</td><td>${esc(x.presentRoom||x.room||'—')}</td><td>${badge(x.status)}</td><td>${esc(x.notes||'—')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Nenhuma ocorrência diferente de Presente foi registrada.</div>'}</section></div>`}
-function config(){return `${pageHead('Configurações','Preferências, segurança dos dados e atualização do aplicativo.') }<div class="dashboard-grid"><section class="card panel"><div class="panel-head"><h2>Identificação</h2></div><label class="muted">Responsável<input class="control" style="width:100%;margin-top:6px" id="cfgResponsible" value="${esc(state.settings.responsible||APP_META.responsible)}"></label><br><button class="btn primary" id="saveConfig">Salvar alterações</button></section><section class="card panel"><div class="panel-head"><h2>Dados</h2></div><p class="muted">O aplicativo usa IndexedDB no navegador para manter os registros neste dispositivo.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="backupBtn">Fazer backup</button><label class="btn ghost">Restaurar backup<input type="file" id="restoreFile" accept="application/json" hidden></label></div></section><section class="card panel"><div class="panel-head"><h2>Atualizações</h2><span id="updateStatus" class="muted">Versão atual: V6.4</span></div><p class="muted">Verifique se existe uma nova versão publicada e atualize sem apagar seus registros locais.</p><button class="btn primary" id="checkUpdate">Verificar atualização</button></section></section></div>`}
+function config(){return `${pageHead('Configurações','Preferências, segurança dos dados e atualização do aplicativo.') }<div class="dashboard-grid"><section class="card panel"><div class="panel-head"><h2>Identificação</h2></div><label class="muted">Responsável<input class="control" style="width:100%;margin-top:6px" id="cfgResponsible" value="${esc(state.settings.responsible||APP_META.responsible)}"></label><br><button class="btn primary" id="saveConfig">Salvar alterações</button></section><section class="card panel"><div class="panel-head"><h2>Dados</h2></div><p class="muted">O aplicativo usa IndexedDB no navegador para manter os registros neste dispositivo.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="backupBtn">Fazer backup</button><label class="btn ghost">Restaurar backup<input type="file" id="restoreFile" accept="application/json" hidden></label></div></section><section class="card panel"><div class="panel-head"><h2>Atualizações</h2><span id="updateStatus" class="muted">Versão atual: V6.6</span></div><p class="muted">Verifique se existe uma nova versão publicada e atualize sem apagar seus registros locais.</p><button class="btn primary" id="checkUpdate">Verificar atualização</button></section></section></div>`}
 
 // Delegação de eventos da tela atual: não é necessário reanexar listeners após cada renderização.
 document.addEventListener('change',async e=>{if(e.target.id==='fTargetRoom'){const id=$('#inspectionId')?.value;const x=state.schedule.find(r=>String(r.id)===String(id));if(x){const c=roomProgress(x).checks.find(c=>c.room===e.target.value);if(c){$('#fStatus').value=c.status||'';$('#fTeacher').value=c.presentTeacher||'';$('#fRoom').value=c.presentRoom||c.room||'';$('#fChecked').value=c.checkedTime||'';$('#fStart').value=c.realStart||'';$('#fEnd').value=c.realEnd||'';$('#fNotes').value=c.notes||'';}}return;}if(e.target.id==='rondaDate'||e.target.id==='scaleDate'){state.date=e.target.value;render()}if(e.target.id==='historyMonth'){state.historyMonth=e.target.value;render()}if(e.target.id==='historyStatus'){state.historyStatus=e.target.value;render()}if(e.target.id==='reportMonth'){state.date=e.target.value+'-01';render()}if(e.target.id==='restoreFile'){await restoreBackup(e.target.files?.[0])}});
 document.addEventListener('input',e=>{if(e.target.id==='scaleSearch'){state.search=e.target.value;render()}if(e.target.id==='teacherSearch'){$$('#teacherCards .teacher-card').forEach(c=>c.style.display=c.dataset.name.includes(e.target.value.toLowerCase())?'':'none')}});
-document.addEventListener('click',async e=>{if(e.target.closest('[data-new-class]')){openNewClass()}if(e.target.id==='exportHistory'){exportHistory()}if(e.target.id==='exportCsv'){exportCSV()}if(e.target.id==='generatePdf'){generateMonthlyPdf()}if(e.target.id==='saveConfig'){await saveConfig()}if(e.target.id==='backupBtn'){await backup()}if(e.target.id==='checkUpdate'){await checkForUpdate()}const edit=e.target.closest('[data-edit-history]');if(edit){await editHistory(edit.dataset.editHistory)}const del=e.target.closest('[data-delete-history]');if(del){await deleteHistory(del.dataset.deleteHistory)}});
+document.addEventListener('click',async e=>{if(e.target.closest('[data-new-class]')){openNewClass()}if(e.target.id==='exportHistory'){exportHistory()}if(e.target.id==='exportCsv'){exportCSV()}if(e.target.id==='generatePdf'){generateMonthlyPdf()}if(e.target.id==='saveConfig'){await saveConfig()}if(e.target.id==='backupBtn'){await backup()}if(e.target.id==='checkUpdate'){await checkForUpdate()}const edit=e.target.closest('[data-edit-history]');if(edit){await editHistory(edit.dataset.editHistory)}const del=e.target.closest('[data-delete-history]');if(del){await deleteHistory(del.dataset.deleteHistory,del.dataset.deleteHistoryInspection)}const delRound=e.target.closest('[data-delete-round]');if(delRound){await deleteRound(delRound.dataset.deleteRound)}});
 
 async function openInspection(id,mode='normal',roomHint=''){const x=state.schedule.find(r=>String(r.id)===String(id));if(!x)return;const p=roomProgress(x);const eligible=mode==='followup'?p.followUps:p.pending;const options=(roomHint?eligible.filter(c=>c.room===roomHint):eligible);const list=options.length?options:eligible.length?eligible:p.checks;$('#inspectionId').value=x.id;$('#dialogSchedule').innerHTML=`<strong>${esc(x.start||'--:--')} — ${esc(x.end||'--:--')}</strong><small>${esc(x.period||'')}<br>${esc(x.scheduledTeacher||'Professor não informado')}<br>${esc((x.subject||'').replace(/\n/g,' • '))}</small><div class="room-progress-note">${p.done}/${p.total} sala(s) fiscalizada(s)${p.pending.length?` • falta(m): ${p.pending.map(c=>esc(c.room)).join(', ')}`:''}${p.followUps.length?` • retorno(s): ${p.followUps.map(c=>esc(c.room)).join(', ')}`:''}</div>`;$('#fTargetRoom').innerHTML=list.map(c=>`<option value="${esc(c.room)}">${esc(c.room)}${c.followUpPending?' — RETORNO':''}</option>`).join('');$('#fTargetRoom').value=roomHint&&list.some(c=>c.room===roomHint)?roomHint:list[0]?.room||'';$('#fTargetRoom').disabled=list.length<=1;const c=list[0]||emptyRoomCheck(x.room);$('#fStatus').value=c.status||'';$('#fTeacher').value=c.presentTeacher||'';$('#fRoom').value=c.presentRoom||c.room||'';$('#fChecked').value=c.checkedTime||'';$('#fStart').value=c.realStart||'';$('#fEnd').value=c.realEnd||'';$('#fNotes').value=c.notes||'';$('#inspectionDialog').dataset.mode=mode;$('#inspectionDialog').dataset.room=roomHint||c.room||'';$('#inspectionDialog').showModal()}
 function closeDialog(){$('#inspectionDialog').close()}
@@ -228,8 +313,23 @@ async function saveNewClass(e){
   await db.bulkPut('schedule',records); await reload(); state.date=date; closeNewClass(); navigate('ronda'); toast(`${records.length} registro(s) adicionados à escala.`);
 }
 
-async function editHistory(id){const x=state.schedule.find(r=>String(r.id)===String(id));if(!x){toast('Registro não encontrado.','error');return;}await openInspection(id);}
-async function deleteHistory(id){const x=state.schedule.find(r=>String(r.id)===String(id));if(!x){toast('Registro não encontrado.','error');return;}if(!confirm(`Excluir o histórico de ${x.scheduledTeacher||'este professor'} em ${fmtDate(x.date)}? A aula continuará na escala como pendente.`))return;const matches=state.inspections.filter(i=>i.scheduleId===x.id || (!i.scheduleId && i.date===x.date && i.scheduledTeacher===x.scheduledTeacher && (i.plannedRoom||'')===(x.room||'')));for(const i of matches){if(i.id!=null)await db.remove('inspections',i.id);}const reset={...x,status:null,presentTeacher:null,presentRoom:null,checkedTime:null,realStart:null,realEnd:null,notes:null,recordStatus:'Pendente',updatedAt:new Date().toISOString()};await db.put('schedule',reset);await reload();render();toast('Histórico excluído. A aula voltou para as pendências.');}
+async function editHistory(id){const x=state.schedule.find(r=>String(r.id)===String(id));if(!x){toast('Registro de ronda não encontrado.','error');return;}await openInspection(id);}
+async function deleteHistory(id,inspectionId){
+  const x=state.schedule.find(r=>String(r.id)===String(id));
+  if(x){
+    if(!confirm(`Excluir o histórico desta ronda em ${fmtDate(x.date)}? A aula continuará na escala como pendente.`))return;
+    const matches=state.inspections.filter(i=>String(i.scheduleId)===String(x.id));
+    for(const i of matches) if(i.id!=null) await db.remove('inspections',i.id);
+    const reset={...x,status:null,presentTeacher:null,presentRoom:null,checkedTime:null,realStart:null,realEnd:null,notes:null,recordStatus:'Pendente',followUpPending:false,roomChecks:normalizeRoomChecks({...x,roomChecks:undefined}),updatedAt:new Date().toISOString()};
+    await db.put('schedule',reset);await reload();render();toast('Histórico excluído. A ronda voltou para as pendências.');return;
+  }
+  if(inspectionId){
+    if(!confirm('Excluir este registro do histórico?'))return;
+    await db.remove('inspections',Number.isNaN(Number(inspectionId))?inspectionId:Number(inspectionId));
+    await reload();render();toast('Registro histórico excluído.');
+  }
+}
+
 async function saveConfig(){const responsible=$('#cfgResponsible').value.trim();await db.put('settings',{key:'app',institution:state.settings.institution||APP_META.institution,responsible});await reload();toast('Configuração salva.')}
 async function backup(){const data=await db.exportDatabase();download(`fiscaliza-docente-backup-${todayISO()}.json`,JSON.stringify(data,null,2),'application/json');toast('Backup exportado.')}
 async function restoreBackup(file){if(!file)return;try{const data=JSON.parse(await file.text());if(!confirm('Restaurar este backup substituirá os dados locais atuais. Continuar?'))return;await db.importDatabase(data);await reload();render();toast('Backup restaurado.')}catch(err){toast(err.message||'Backup inválido.','error')}}
