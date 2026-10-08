@@ -113,10 +113,8 @@ export async function seedIfEmpty(initialData) {
   // V3.3: reparo seguro. Nunca limpa a base existente e nunca substitui
   // registros já salvos pelo usuário. Apenas adiciona o que estiver faltando.
   const existingSchedule = await getAll("schedule");
-  const deletedRecord = await get("settings", "deletedScheduleIds");
-  const deletedIds = new Set(deletedRecord?.ids || []);
   const existingIds = new Set(existingSchedule.map(item => item.id));
-  const missingSchedule = initialData.schedule.filter(item => !existingIds.has(item.id) && !deletedIds.has(item.id));
+  const missingSchedule = initialData.schedule.filter(item => !existingIds.has(item.id));
 
   if (missingSchedule.length) {
     await bulkPut("schedule", missingSchedule);
