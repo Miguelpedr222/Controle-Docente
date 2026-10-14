@@ -113,8 +113,21 @@ export async function seedIfEmpty(initialData) {
   // V3.3: reparo seguro. Nunca limpa a base existente e nunca substitui
   // registros já salvos pelo usuário. Apenas adiciona o que estiver faltando.
   const existingSchedule = await getAll("schedule");
-  const existingIds = new Set(existingSchedule.map(item => item.id));
-  const missingSchedule = initialData.schedule.filter(item => !existingIds.has(item.id));
+  const existingIds = new Set(existingSchedule.map(item => String(item.id)));
+  const deletedRecord = await get("settings", "deletedScheduleIds");
+  const deletedIds = new Set((deletedRecord?.ids || []).map(String));
+  const norm = value => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[–—−]/g, "-").toLowerCase().replace(/\s+/g, " ").trim();
+  const signature = item => [item.date, item.start, item.end, item.period, item.room, item.scheduledTeacher, item.subject].map(norm).join("|");
+  const existingSignatures = new Set(existingSchedule.map(signature));
+  const missingSchedule = [];
+  for (const item of initialData.schedule) {
+    if (existingIds.has(String(item.id)) || deletedIds.has(String(item.id))) continue;
+    const sig = signature(item);
+    if (existingSignatures.has(sig)) continue;
+    missingSchedule.push(item);
+    existingIds.add(String(item.id));
+    existingSignatures.add(sig);
+  }
 
   if (missingSchedule.length) {
     await bulkPut("schedule", missingSchedule);

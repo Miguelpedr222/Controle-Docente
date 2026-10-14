@@ -1,11 +1,11 @@
-// Base revisada a partir da planilha Controle Docente (Rascunho) 1 1 (3).xlsx
+// Base revisada a partir da planilha Controle Docente (Rascunho) 1 1 (6).xlsx
 // 964 aulas datadas revisadas; horários normalizados; professores com abreviações/erros evidentes consolidados.
 
 export const APP_META = {
   "institution": "UNIG — Universidade Iguaçu",
   "appName": "Fiscaliza Docente",
-  "version": "1.1.0",
-  "importedAt": "2026-10-07",
+  "version": "6.7.0",
+  "importedAt": "2026-10-14",
   "responsible": "João Miguel Alves Pedrosa"
 };
 
