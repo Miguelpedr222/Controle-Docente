@@ -40,7 +40,7 @@
       </nav>
       <div class="sidebar-bottom">
         <div class="local-status"><span></span><div><strong>Modo local</strong><small>Dados neste dispositivo</small></div></div>
-        <div class="sidebar-version">Fiscaliza Docente V6.8.1</div>
+        <div class="sidebar-version">Fiscaliza Docente V6.13.4</div>
       </div>
     </aside>
 
@@ -69,7 +69,7 @@
   <div class="toast-host" id="toastHost"></div>
 
   <dialog id="inspectionDialog">
-    <form id="inspectionForm" class="dialog-card">
+    <form id="inspectionForm" class="dialog-card" autocomplete="off">
       <div class="dialog-head">
         <div><small>REGISTRO DE RONDA</small><h2>Fiscalizar aula</h2></div>
         <button type="button" class="close-btn" id="closeDialog">×</button>
@@ -81,14 +81,14 @@
         <label>Situação<select id="fStatus" required>
           <option value="">Selecione</option><option>Presente</option><option>Substituição</option><option>Atraso</option><option>Falta</option><option>Justificada</option><option>Turmas Unificadas</option><option>Aula cancelada</option><option>Professor não localizado</option><option>Professor não identificado</option><option>Outro</option>
         </select></label>
-        <label>Professor presente<input id="fTeacher" list="teacherList" placeholder="Quem foi encontrado?"></label>
+        <label>Professor presente<input id="fTeacher" name="fTeacher_current" list="teacherList" placeholder="Quem foi encontrado?" autocomplete="new-password" autocapitalize="words" spellcheck="false"></label>
         <label>Sala presente<input id="fRoom" placeholder="Ex.: K-507"></label>
         <label>Horário fiscalizado<input id="fChecked" type="time"></label>
         <label>Início real<input id="fStart" type="time"></label>
         <label>Término real<input id="fEnd" type="time"></label>
         <label class="full">Observações<textarea id="fNotes" rows="4" placeholder="Registre substituição, turma unificada, sala alterada, professor ausente etc."></textarea></label>
       </div>
-      <div class="dialog-actions"><button type="button" class="btn ghost" id="cancelDialog">Cancelar</button><button class="btn primary" type="submit">Salvar fiscalização</button></div>
+      <div class="dialog-actions"><button type="button" class="btn ghost" id="cancelDialog">Cancelar</button><button type="button" class="btn ghost danger" id="concludeFollowupDialog" hidden>Concluir ronda sem retorno</button><button class="btn primary" type="submit">Salvar fiscalização</button></div>
     </form>
   </dialog>
 
