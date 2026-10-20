@@ -12,3 +12,8 @@ O arquivo backup-fiscaliza-docente-2026-10-20.json contém o backup mais recente
 Para restaurá-lo no aplicativo: abra Configurações > Dados > Restaurar backup e selecione esse JSON.
 Por segurança, a restauração não é executada automaticamente ao abrir o app, evitando sobrescrever ou misturar dados locais sem confirmação.
 Mantenha uma cópia externa do JSON original.
+
+Atualização v6.19.1: o relatório diário não exibe registros sem situação ou marcados como “Pendente”; esses registros continuam preservados na escala e nos dados do aplicativo.
+
+
+Versão 6.20.0: o relatório diário e mensal usa como fonte as aulas que permanecem na aba Ronda. Fiscalizações sem aula ativa vinculada deixam de aparecer, e aulas removidas da Ronda não são recriadas no relatório. O resumo conta apenas situações efetivamente registradas, sem pendentes.
