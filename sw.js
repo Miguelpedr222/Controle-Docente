@@ -1,9 +1,10 @@
-const CACHE_NAME = "fiscaliza-docente-pwa-v6-16-1";
+const CACHE_NAME = "fiscaliza-docente-pwa-v6-17-0";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
+  "./supabase-sync.js",
   "./data.js",
   "./database.js",
   "./utils.js",
