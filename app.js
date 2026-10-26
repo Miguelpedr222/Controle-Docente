@@ -81,6 +81,7 @@ function bindNavigation(){
     const go=e.target.closest('[data-go]');
     if(go){e.preventDefault();navigate(go.dataset.go);return;}
   });
+  document.addEventListener('change',e=>{if(e.target.matches('[data-dashboard-date]')){const value=e.target.value;if(value){state.date=value;render();}}});
   $('#menuBtn').addEventListener('click',()=>{$('#sidebar').classList.add('open');$('#backdrop').classList.add('show')});
   $('#backdrop').addEventListener('click',closeMenu);
   $('#moreBtn').addEventListener('click',()=>{$('#sidebar').classList.add('open');$('#backdrop').classList.add('show')});
@@ -189,30 +190,55 @@ function rondaGroups(rows){return rows.map(x=>[x]).sort((a,b)=>String(a[0]?.star
 function nextRonda(){const base=state.date||todayISO();const dates=[...new Set(state.schedule.map(x=>String(x.date||'')).filter(d=>d>=base))].sort();for(const date of dates){const found=orderedPendingRowsForDate(date)[0];if(found)return found;}return null;}
 function followUpRowsForDate(date){return state.schedule.filter(x=>x.date===date&&roundNeedsFollowUp(x)).sort((a,b)=>String(a.start||'99:99').localeCompare(String(b.start||'99:99')));}
 function dashboard(){
-  const all=state.schedule, done=all.filter(x=>x.status), present=done.filter(x=>x.status==='Presente'), pending=all.length-done.length;
-  const subs=done.filter(x=>(x.status||'').includes('Substit')), abs=done.filter(x=>['Falta','Professor não localizado'].includes(x.status));
-  const late=done.filter(x=>x.status==='Atraso'), justified=done.filter(x=>x.status==='Justificada');
-  const pct=all.length?Math.round(done.length/all.length*100):0;
-  const next=nextRonda(), nowText=deviceTime(), timing=next?rondaTiming(next):null;
-  const today=all.filter(x=>x.date===state.date).slice(0,6);
-  const nextLabel=timing?.key==='overdue'?'RONDA ATRASADA':'PRÓXIMA RONDA';
-  const nextHint=timing?.key==='overdue'?'O horário desta aula já começou e ela ainda está pendente. Faça esta sala agora.':(String(next?.date||'')===todayISO()?'Próxima aula pendente de hoje.':'Próxima aula pendente na escala.');
-  const nextCard=next?`<section class="next-round card panel ${timing.key==='overdue'?'is-overdue':''}"><div class="next-round-label">${nextLabel}</div><div class="device-clock">Horário do dispositivo: <strong>${nowText}</strong></div><div class="next-round-main"><div><span class="muted">${fmtDate(next.date)} • ${esc(next.start||'--:--')} — ${esc(next.end||'--:--')}</span><h2>${esc(next.room||'Sala não definida')}</h2><p>${esc((next.subject||'').replace(/\n/g,' • '))}</p><div class="next-teacher">${esc(nextHint)}<br>Professor escalado: <strong>${esc(next.scheduledTeacher||'Não informado')}</strong></div></div><button class="btn primary" data-next-ronda>Ir para a ronda →</button></div></section>`:`<section class="card panel"><div class="empty"><strong>Nenhuma ronda pendente encontrada.</strong><p>Horário do dispositivo: <strong>${nowText}</strong>. Você pode cadastrar uma nova aula pela Escala.</p></div></section>`;
-  const statusData=[['Presente',present.length,'#159447'],['Atraso',late.length,'#d98a00'],['Falta',abs.length,'#d64545'],['Substituição',subs.length,'#4d6fd8'],['Justificada',justified.length,'#7b61c8'],['Outras',Math.max(0,done.length-present.length-late.length-abs.length-subs.length-justified.length),'#718096']];
-  const topTeachers=teacherAnalytics().sort((a,b)=>b.occurrences-a.occurrences).slice(0,6);
-  const maxOcc=Math.max(1,...topTeachers.map(x=>x.occurrences));
-  const month=state.date.slice(0,7);
-  const monthly=monthlyAnalytics(month);
-  return `<section class="hero"><img class="hero-mark" src="./unig-logo-transparent.png" alt=""><div><small>UNIVERSIDADE IGUAÇU • MEDICINA</small><h1>Fiscaliza Docente</h1><p>Central de acompanhamento das rondas, ocorrências e histórico docente.</p><div class="hero-actions"><button class="btn light" data-next-ronda>Próxima ronda</button><button class="btn" style="background:rgba(255,255,255,.12);color:#fff" data-new-class>+ Nova aula</button><button class="btn" style="background:rgba(255,255,255,.12);color:#fff" data-go="professores">Fichas dos docentes</button></div></div></section>
-  ${nextCard}
-  ${pageHead('Visão geral','Indicadores calculados automaticamente a partir dos registros já salvos.')}
-  <section class="metrics">${metric('Registros',all.length,'base carregada')}${metric('Fiscalizados',done.length,`${pct}% concluído`)}${metric('Presenças',present.length,'situação registrada')}${metric('Ocorrências',done.length-present.length,'não presenciais')}${metric('Pendentes',pending,'aguardando ronda')}</section>
-  <div class="analytics-grid">
-    <section class="card panel chart-card"><div class="panel-head"><div><h2>Distribuição das situações</h2><span class="muted">Todos os registros fiscalizados</span></div></div><div class="bar-chart">${statusData.map(([label,val,color])=>`<div class="bar-row"><span>${esc(label)}</span><div class="bar-track"><i style="width:${done.length?Math.max(val/done.length*100,val?3:0):0}%;background:${color}"></i></div><strong>${val}</strong></div>`).join('')}</div></section>
-    <section class="card panel chart-card"><div class="panel-head"><div><h2>Professores com mais ocorrências</h2><span class="muted">Clique em um professor para abrir a ficha</span></div></div>${topTeachers.length?`<div class="rank-chart">${topTeachers.map(x=>`<button class="rank-row" data-teacher="${esc(x.name)}"><span class="rank-pos">${x.rank}</span><span class="rank-name">${esc(x.name)}</span><div class="rank-track"><i style="width:${Math.max(x.occurrences/maxOcc*100,x.occurrences?4:0)}%"></i></div><strong>${x.occurrences}</strong></button>`).join('')}</div>`:`<div class="empty">Ainda não há ocorrências suficientes para montar o ranking.</div>`}</section>
-  </div>
-  <section class="card panel chart-card"><div class="panel-head"><div><h2>Evolução mensal</h2><span class="muted">Registros fiscalizados por mês</span></div></div><div class="monthly-chart">${monthly.map(m=>`<div class="month-col"><div class="month-value">${m.total}</div><div class="month-bar-wrap"><i style="height:${m.max?Math.max(m.total/m.max*100,m.total?5:0):0}%"></i></div><span>${m.label}</span></div>`).join('')}</div></section>
-  <div class="dashboard-grid"><section class="card panel"><div class="panel-head"><h2>Ronda selecionada</h2><span class="muted">${fmtDate(state.date)}</span></div><div style="margin-bottom:14px"><div class="muted" style="margin-bottom:7px">Progresso geral</div><div class="progress"><span style="width:${pct}%"></span></div></div>${today.length?today.map(x=>miniRow(x)).join(''):`<div class="empty"><strong>Nenhuma escala cadastrada para ${fmtDate(state.date)}.</strong>Escolha outra data em Escala ou Rondas.</div>`}</section><section class="card panel"><div class="panel-head"><h2>Situações</h2></div>${[['Presente',present.length],['Substituição',subs.length],['Falta',abs.length],['Atraso',late.length],['Justificada',justified.length],['Pendente',pending]].map(([n,v])=>`<div class="kpi"><span>${n}</span>${badge(n==='Pendente'?'Pendente':n)}<strong style="margin-left:auto;margin-right:4px">${v}</strong></div>`).join('')}</section></div>`;
+  // Painel calculado a partir das aulas e das salas registradas na Ronda.
+  // A escala serve apenas como cadastro das aulas; o status vem de roomChecks.
+  const selectedDate=state.date||todayISO();
+  const aulas=state.schedule.filter(x=>!x.unregisteredRoom);
+  const dateRows=aulas.filter(x=>String(x.date||'')===selectedDate);
+  const checksFor=rows=>rows.flatMap(x=>roomProgress(x).checks.map(c=>({...c,_round:x}))).filter(c=>c.room);
+  const selectedChecks=checksFor(dateRows);
+  const doneChecks=selectedChecks.filter(c=>c.done&&c.status);
+  const pendingChecks=selectedChecks.filter(c=>!c.done);
+  const countStatus=(status)=>doneChecks.filter(c=>String(c.status||'').toLowerCase()===status.toLowerCase()).length;
+  const present=countStatus('Presente');
+  const late=countStatus('Atraso');
+  const substitute=countStatus('Substituição');
+  const absence=doneChecks.filter(c=>['Falta','Professor não localizado'].includes(c.status)).length;
+  const justified=countStatus('Justificada');
+  const other=Math.max(0,doneChecks.length-present-late-substitute-absence-justified);
+  const coverage=selectedChecks.length?Math.round(doneChecks.length/selectedChecks.length*100):0;
+  const totalAulas=dateRows.length;
+  const completeAulas=dateRows.filter(x=>roomProgress(x).complete).length;
+  const nextCandidates=aulas.filter(x=>String(x.date||'')>=todayISO()&&!roomProgress(x).complete&&!state.skippedRounds.includes(roundKey(x))).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.start||'99:99').localeCompare(String(b.start||'99:99')));
+  const next=nextCandidates[0]||null;
+  const timing=next?rondaTiming(next):null;
+  const statusPalette=[['Presente',present,'#16865b'],['Atraso',late,'#d78b18'],['Substituição',substitute,'#536bd8'],['Falta / não localizado',absence,'#d64c58'],['Justificada',justified,'#8065c9'],['Outras situações',other,'#8292a3']];
+  let cursor=0; const totalDone=doneChecks.length;
+  const gradient=totalDone?`conic-gradient(${statusPalette.map(([label,n,color])=>{const from=cursor;cursor+=n/totalDone*100;return `${color} ${from}% ${cursor}%`;}).join(',')})`:'conic-gradient(#e8edf2 0% 100%)';
+  const trend=[]; const anchor=new Date(selectedDate+'T00:00:00');
+  for(let i=6;i>=0;i--){const d=new Date(anchor);d.setDate(anchor.getDate()-i);const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;const dayRows=aulas.filter(x=>String(x.date||'')===key);const dayChecks=checksFor(dayRows).filter(c=>c.done&&c.status);trend.push({key,label:d.toLocaleDateString('pt-BR',{weekday:'short'}).replace('.',''),total:dayChecks.length,present:dayChecks.filter(c=>c.status==='Presente').length,occurrences:dayChecks.filter(c=>c.status!=='Presente').length});}
+  const maxTrend=Math.max(1,...trend.map(x=>x.total));
+  const trendHtml=trend.map(d=>`<div class="exec-trend-col" title="${fmtDate(d.key)}: ${d.total} fiscalização(ões)"><div class="exec-trend-total">${d.total}</div><div class="exec-trend-bar"><i class="exec-trend-presence" style="height:${d.total?d.present/maxTrend*100:0}%"></i><i class="exec-trend-occurrence" style="height:${d.total?d.occurrences/maxTrend*100:0}%"></i></div><span>${esc(d.label)}</span></div>`).join('');
+  const recent=checksFor(aulas).filter(c=>c.done&&c.status).sort((a,b)=>String(b._round.date||'').localeCompare(String(a._round.date||''))||String(b.checkedTime||'').localeCompare(String(a.checkedTime||''))).slice(0,7);
+  const nextCard=next?`<section class="exec-next ${timing?.key==='overdue'?'is-overdue':''}"><div class="exec-next-icon">${timing?.key==='overdue'?'!':'↗'}</div><div class="exec-next-copy"><span class="exec-eyebrow">${timing?.key==='overdue'?'RONDA EM ATRASO':'PRÓXIMA AULA A FISCALIZAR'}</span><h2>${esc(next.room||'Sala não definida')} <span>${esc(next.start||'--:--')}–${esc(next.end||'--:--')}</span></h2><p>${esc((next.subject||'Disciplina não informada').replace(/\n/g,' • '))} · ${esc(next.scheduledTeacher||'Professor não informado')}</p><small>${fmtDate(next.date)} · ${roomProgress(next).done}/${roomProgress(next).total} sala(s) fiscalizada(s)</small></div><button class="btn primary" data-next-ronda>Continuar ronda <span aria-hidden="true">→</span></button></section>`:`<section class="exec-next exec-next-empty"><div class="exec-next-icon">✓</div><div class="exec-next-copy"><span class="exec-eyebrow">FILA DE RONDAS</span><h2>Não há aulas pendentes para fiscalizar</h2><p>Quando houver uma aula em aberto na Ronda, ela aparecerá aqui.</p></div><button class="btn ghost" data-go="ronda">Abrir Rondas →</button></section>`;
+  const statusLegend=statusPalette.map(([label,n,color])=>`<div class="exec-legend-row"><i style="background:${color}"></i><span>${esc(label)}</span><strong>${n}</strong><small>${totalDone?Math.round(n/totalDone*100):0}%</small></div>`).join('');
+  const recentHtml=recent.length?recent.map(c=>`<div class="exec-activity-row"><div class="exec-activity-dot ${statusClass(c.status)}"></div><div class="exec-activity-main"><strong>${esc(c._round.scheduledTeacher||c.presentTeacher||'Professor não informado')}</strong><span>${esc(c._round.subject||'Disciplina não informada')} · Sala ${esc(c.room||'—')}</span></div><div class="exec-activity-meta">${badge(c.status)}<small>${fmtDate(c._round.date)}${c.checkedTime?' · '+esc(c.checkedTime):''}</small></div></div>`).join(''):`<div class="exec-empty"><span>▤</span><strong>Nenhuma fiscalização registrada</strong><p>As atividades concluídas na Ronda aparecerão nesta lista automaticamente.</p></div>`;
+  return `<div class="exec-dashboard">
+    <header class="exec-heading"><div><span class="exec-eyebrow">UNIG · MEDICINA · NOVA IGUAÇU</span><h1>Painel de controle</h1><p>Visão operacional das aulas e fiscalizações registradas na Ronda.</p></div><div class="exec-date-control"><label for="dashboardDate">Data de referência</label><input id="dashboardDate" class="control" type="date" data-dashboard-date value="${esc(selectedDate)}"></div></header>
+    ${nextCard}
+    <section class="exec-kpis">
+      <article class="exec-kpi"><div class="exec-kpi-top"><span>Aulas na Ronda</span><i class="exec-kpi-icon blue">▦</i></div><strong>${totalAulas}</strong><small>${completeAulas} aula(s) com todas as salas fiscalizadas</small><div class="exec-kpi-foot"><span style="width:${totalAulas?completeAulas/totalAulas*100:0}%"></span></div></article>
+      <article class="exec-kpi"><div class="exec-kpi-top"><span>Salas fiscalizadas</span><i class="exec-kpi-icon green">✓</i></div><strong>${doneChecks.length}</strong><small>De ${selectedChecks.length} sala(s) previstas na Ronda</small><div class="exec-kpi-foot"><span style="width:${coverage}%"></span></div></article>
+      <article class="exec-kpi"><div class="exec-kpi-top"><span>Presenças</span><i class="exec-kpi-icon green">●</i></div><strong>${present}</strong><small>${totalDone?Math.round(present/totalDone*100):0}% das fiscalizações concluídas</small><div class="exec-kpi-accent green"></div></article>
+      <article class="exec-kpi"><div class="exec-kpi-top"><span>Ocorrências</span><i class="exec-kpi-icon amber">!</i></div><strong>${doneChecks.length-present}</strong><small>Atrasos, faltas e demais situações</small><div class="exec-kpi-accent amber"></div></article>
+    </section>
+    <div class="exec-charts-grid">
+      <section class="card panel exec-chart-card"><div class="exec-section-head"><div><span class="exec-eyebrow">DISTRIBUIÇÃO</span><h2>Situações registradas</h2><p>Somente fiscalizações concluídas na Ronda de ${fmtDate(selectedDate)}.</p></div><span class="exec-total-pill">${totalDone} registros</span></div><div class="exec-donut-layout"><div class="exec-donut" style="background:${gradient}"><div><strong>${totalDone}</strong><span>fiscalizações</span></div></div><div class="exec-legend">${statusLegend}</div></div></section>
+      <section class="card panel exec-chart-card"><div class="exec-section-head"><div><span class="exec-eyebrow">ÚLTIMOS 7 DIAS</span><h2>Volume de fiscalizações</h2><p>Comparativo entre presenças e outras situações registradas.</p></div><span class="exec-chart-key"><i></i> Presenças <i class="amber"></i> Ocorrências</span></div><div class="exec-trend-chart">${trendHtml}</div><div class="exec-trend-axis"><span>${fmtDate(trend[0].key)}</span><span>${fmtDate(trend[6].key)}</span></div></section>
+    </div>
+    <div class="exec-bottom-grid"><section class="card panel exec-activity-card"><div class="exec-section-head"><div><span class="exec-eyebrow">ATIVIDADE RECENTE</span><h2>Últimas fiscalizações</h2><p>Dados reais registrados nas aulas da Ronda.</p></div><button class="btn ghost small" data-go="historico">Ver histórico →</button></div><div class="exec-activity-list">${recentHtml}</div></section>
+      <section class="card panel exec-day-card"><div class="exec-section-head"><div><span class="exec-eyebrow">ACOMPANHAMENTO DIÁRIO</span><h2>Progresso da Ronda</h2><p>${fmtDate(selectedDate)}</p></div></div><div class="exec-day-progress"><div class="exec-day-progress-ring" style="--progress:${coverage*3.6}deg"><div><strong>${coverage}%</strong><span>concluído</span></div></div><div class="exec-day-summary"><div><span>Salas fiscalizadas</span><strong>${doneChecks.length}</strong></div><div><span>Salas restantes</span><strong>${pendingChecks.length}</strong></div><div><span>Aulas concluídas</span><strong>${completeAulas} / ${totalAulas}</strong></div></div></div><button class="btn primary exec-open-rounds" data-go="ronda">Abrir Rondas <span aria-hidden="true">→</span></button></section></div>
+  </div>`;
 }
 function teacherAnalytics(){
   const rowsByName=new Map();

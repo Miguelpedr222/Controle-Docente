@@ -17,3 +17,11 @@ Atualização v6.19.1: o relatório diário não exibe registros sem situação 
 
 
 Versão 6.20.0: o relatório diário e mensal usa como fonte as aulas que permanecem na aba Ronda. Fiscalizações sem aula ativa vinculada deixam de aparecer, e aulas removidas da Ronda não são recriadas no relatório. O resumo conta apenas situações efetivamente registradas, sem pendentes.
+
+Atualização v6.21.0 — Dashboard executivo
+- A tela Início foi reestruturada com layout executivo, indicadores compactos, gráfico de distribuição das situações, tendência dos últimos 7 dias e atividade recente.
+- Os indicadores e gráficos usam as aulas e as verificações de sala gravadas em Rondas (roomChecks), não o status agregado da escala nem o histórico independente de inspeções.
+- O seletor de data atualiza os indicadores e gráficos para o dia escolhido.
+- Salas/aulas artificiais criadas apenas para conferir salas sem aula cadastrada não entram nos indicadores de aulas.
+- Os dados existentes e o backup incluído foram preservados; nenhuma restauração automática foi executada.
+- Validação realizada: sintaxe JavaScript (Node) e integridade do ZIP. A sincronização Supabase e a renderização em navegadores reais não foram testadas nesta execução.
