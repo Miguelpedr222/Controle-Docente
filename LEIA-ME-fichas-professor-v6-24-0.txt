@@ -1,0 +1,10 @@
+FISCALIZA DOCENTE v6.24.0 — FICHAS DE PROFESSORES
+
+Alterações:
+- Ficha individual só inclui docentes que aparecem no campo “Professor presente”.
+- Docente listado apenas como escalado não ganha ficha nem ocorrência individual.
+- Consolidação de registros repetidos entre Ronda e Histórico, com chave de fiscalização/sala e campos funcionais.
+- Novo design em cartões com situação, data, disciplina, professor presente/escalado, horário fiscalizado, período, sala prevista/realizada, origem e observações.
+- Mantém os arquivos de backup incluídos no pacote, sem restaurar ou alterar dados do usuário automaticamente.
+
+Antes de substituir, faça cópia da versão atual. A sincronização remota não foi testada nesta execução.

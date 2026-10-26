@@ -25,3 +25,6 @@ Atualização v6.21.0 — Dashboard executivo
 - Salas/aulas artificiais criadas apenas para conferir salas sem aula cadastrada não entram nos indicadores de aulas.
 - Os dados existentes e o backup incluído foram preservados; nenhuma restauração automática foi executada.
 - Validação realizada: sintaxe JavaScript (Node) e integridade do ZIP. A sincronização Supabase e a renderização em navegadores reais não foram testadas nesta execução.
+
+
+Versao 6.22.0: historico reestruturado em cartoes detalhados. Cada registro exibe professor escalado e presente, disciplina, periodo, sala, horario da aula, horario fiscalizado, origem, atualizacao e observacoes. Os campos de inicio e termino reais nao sao exibidos. O backup incluido nao e restaurado automaticamente.
