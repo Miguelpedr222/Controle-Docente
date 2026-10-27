@@ -141,3 +141,31 @@
 .teacher-record-notes p{margin:5px 0 0;font-size:12px;line-height:1.5;white-space:pre-wrap}
 @media(max-width:900px){.teacher-record-list{grid-template-columns:1fr}}
 @media(max-width:560px){.teacher-record{padding:13px}.teacher-record-fields{gap:12px}.teacher-record-top{flex-wrap:wrap}.teacher-profile-v2{gap:14px}}
+
+
+/* V6.27.0 — redesign completo da tela de relatórios */
+.daily-report-panel,.daily-search-panel,.monthly-report-details{border:1px solid #dfe7ee!important;box-shadow:0 8px 26px rgba(22,48,70,.055)!important;border-radius:18px!important;overflow:hidden}
+.daily-report-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;padding-bottom:22px;border-bottom:1px solid #e9eff4}
+.daily-report-head h2{font-size:22px;letter-spacing:-.035em;color:#163a56;margin:5px 0 6px}
+.daily-report-head .eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;color:#34759b}
+.daily-date-label{display:grid;gap:7px;min-width:190px;color:#536a7d;font-size:11px;font-weight:700}
+.daily-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;margin:20px 0}
+.daily-kpi{min-width:0;padding:16px 15px;border:1px solid #e0e8ef;border-radius:13px;background:linear-gradient(145deg,#fff,#f8fbfd)}
+.daily-kpi span,.daily-kpi small{display:block;color:#687d90;font-size:10px;line-height:1.45}
+.daily-kpi strong{display:block;font-size:27px;letter-spacing:-.04em;line-height:1.2;color:#183c58;margin:8px 0}
+.daily-kpi.success{background:linear-gradient(145deg,#f5fcf8,#edf8f2);border-color:#d5eadf}.daily-kpi.success strong{color:#19704a}
+.daily-kpi.attention{background:linear-gradient(145deg,#fffaf0,#fff5df);border-color:#f0e0b9}.daily-kpi.attention strong{color:#9b6a08}
+.daily-insights-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(260px,.85fr);gap:13px;margin-bottom:20px}
+.daily-chart-card,.daily-note-card{border:1px solid #e1e9ef;border-radius:14px;padding:17px;background:#fff;min-width:0}
+.daily-chart-card .panel-head h3,.daily-note-card h3{font-size:14px;color:#193c57;margin:0}
+.daily-chart-content{display:flex;align-items:center;justify-content:center;gap:22px;min-height:190px;padding:14px 0 2px}
+.daily-pie{width:142px;height:142px;flex:0 0 142px;border-radius:50%;display:grid;place-items:center;position:relative}
+.daily-pie-hole{width:88px;height:88px;border-radius:50%;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 0 1px #edf1f4}
+.daily-pie-hole strong{font-size:25px;line-height:1.1;color:#193c57}.daily-pie-hole span{font-size:10px;color:#7a8b9a}
+.daily-legend{display:grid;gap:9px;min-width:0}.daily-legend>div{display:grid;grid-template-columns:9px minmax(0,1fr) auto;align-items:center;gap:8px;font-size:11px;color:#5c7184}.daily-legend i{width:8px;height:8px;border-radius:3px}.daily-legend strong{color:#1e405a}
+.daily-note-card p{font-size:12px;line-height:1.7;color:#63788b;margin:13px 0 18px}.daily-progress>div:first-child{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#667c8e;margin-bottom:8px}.daily-progress strong{color:#183c58}.daily-progress-track{height:7px;border-radius:99px;background:#eaf0f4;overflow:hidden}.daily-progress-track i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#2b709a,#2c9b73)}
+.daily-status-overview{padding-top:17px;border-top:1px solid #e9eff4}.daily-status-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}.daily-status-chip{display:inline-flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid #dfe7ee;border-radius:10px;background:#fbfdff;color:#526a7d;font-size:11px;cursor:pointer;transition:transform .15s,border-color .15s}.daily-status-chip:hover{transform:translateY(-1px);border-color:#8eafc4}.daily-status-chip strong{color:#193c57;font-size:12px}.daily-status-dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.daily-search-panel{margin-top:17px}.daily-search-panel>.panel-head h2{font-size:17px;color:#193c57}.daily-search-controls{display:grid;grid-template-columns:minmax(220px,1fr) minmax(170px,.35fr) auto;gap:9px;margin:15px 0}.daily-table{min-width:760px}.daily-table thead th{font-size:10px;letter-spacing:.035em}.daily-table tbody tr:hover{background:#f5f9fc}.cell-sub{display:block;color:#6e8497;font-size:10px;margin-top:4px}
+.monthly-report-details{margin-top:17px;background:#fff}.monthly-report-details>summary{padding:17px 19px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:800;color:#193c57;list-style-position:inside}.monthly-report-details[open]>summary{border-bottom:1px solid #e7edf2;background:#f9fbfd}.monthly-report-details .report-layout{padding:15px}.monthly-report-details .kpi{border:1px solid #e5ebf0;border-radius:10px;padding:11px 13px;margin:8px 0;background:#fbfdff}.monthly-report-details .kpi span{color:#657b8e;font-size:11px}.monthly-report-details .kpi strong{color:#193c57;font-size:17px}.report-limit-note{font-size:11px;padding:8px 2px}
+@media(max-width:1050px){.daily-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.daily-insights-grid{grid-template-columns:1fr}.daily-chart-content{justify-content:flex-start}}
+@media(max-width:650px){.daily-report-head{display:grid;grid-template-columns:1fr}.daily-date-label{min-width:0;width:100%}.daily-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.daily-kpi{padding:12px}.daily-kpi strong{font-size:23px}.daily-chart-content{align-items:flex-start;gap:14px;flex-direction:column}.daily-legend{width:100%}.daily-search-controls{grid-template-columns:1fr}.monthly-report-details>summary{align-items:flex-start}.monthly-report-details .report-layout{padding:9px}}

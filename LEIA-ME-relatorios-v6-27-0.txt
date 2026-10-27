@@ -1,0 +1,11 @@
+FISCALIZA DOCENTE V6.27.0 — REVISÃO DOS RELATÓRIOS
+
+Mudanças desta versão:
+- Reformulação visual da tela de Relatórios, com cartões, indicadores, gráfico, filtros e prévia reorganizados e responsivos.
+- Redesenho do PDF diário e mensal, com hierarquia visual mais clara, cabeçalhos consistentes, distribuição das situações e tabelas/cartões adequados à impressão.
+- Os PDFs não dependem mais do caminho relativo de uma imagem de logotipo, evitando cabeçalho com imagem quebrada em nova janela.
+- O PDF diário usa apenas fiscalizações com situação registrada nos indicadores de fiscalizações, presença e ocorrências; as aulas previstas são contadas separadamente a partir da Ronda.
+- O relatório mensal acompanha o mês selecionado e informa quando a prévia na tela limita a exibição a 100 registros; PDF/CSV mantêm todos os registros do período.
+- Mantida a lógica de origem dos registros na Ronda e sem apagar dados existentes.
+
+Validação realizada: sintaxe JavaScript e integridade do ZIP. Não foi possível validar visualmente em navegador real nem confirmar a renderização final da impressão/PDF ou a sincronização em uma instância Supabase real.
