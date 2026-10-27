@@ -1,0 +1,14 @@
+Fiscaliza Docente v6.30.0 — Relatórios em cards
+
+Alterações:
+- A prévia do relatório mensal na tela exibe cada fiscalização em um card individual.
+- O PDF mensal foi reformulado para A4 retrato, com um card por registro, sem tabela horizontal larga.
+- Cada card apresenta data/dia, disciplina, período, horário da aula, horário fiscal, horários reais quando registrados, professor escalado, professor presente, sala prevista, sala fiscalizada, situação e observações.
+- Mantido o resumo geral e a distribuição por situação no início do relatório.
+- Cada registro é identificado por número sequencial dentro do relatório, sem substituir o ID original.
+- Layout responsivo: duas colunas na tela grande e uma coluna em telas menores; impressão mantém os cards inteiros sempre que possível.
+- Cache do service worker atualizado para v6.30.0.
+
+Validação realizada: node --check nos arquivos app.js/app.mjs da raiz e da pasta supa_actual; integridade do ZIP conferida.
+Limitação: não foi realizado teste visual em navegador real nem teste de impressão física.
+Backup e arquivos de dados existentes foram preservados.

@@ -1,0 +1,10 @@
+Fiscaliza Docente v6.30.1 — Horários completos nos cards
+
+Ajustes nesta versão:
+- Os cards do relatório mensal mantêm o horário da aula e o horário fiscalizado.
+- Registros vinculados à fiscalização agora recuperam também horário real de início e término a partir do campo legado realTime, quando disponível.
+- A data/dia e o horário previsto são preservados ao montar os registros vinculados à escala.
+- Mantidos professor escalado, professor presente, sala prevista, sala fiscalizada, situação e observações.
+- Cache do service worker atualizado para evitar reutilização dos arquivos da versão anterior.
+
+Observação: horários que não foram registrados no momento da fiscalização aparecem como “Não informado” ou “—”; o sistema não inventa valores.
