@@ -1,0 +1,17 @@
+Fiscaliza Docente v6.30.3 — Atualização PWA reforçada
+
+O que mudou:
+- Versão nova do Service Worker e URL versionada para forçar o navegador a revalidar o script.
+- Registro do Service Worker usa updateViaCache: none e chama update() ao abrir.
+- Arquivos HTML/CSS/JS são servidos em estratégia network-first, com cache apenas como fallback offline.
+- Quando o novo controlador assume, a página recarrega uma única vez.
+- A limpeza de cache se limita a caches do app com prefixo fiscaliza-docente-pwa-; não apaga IndexedDB, localStorage ou dados do Supabase.
+- As requisições externas, inclusive Supabase, não são interceptadas.
+
+PUBLICAÇÃO:
+Este ZIP contém os arquivos de publicação na raiz e uma cópia equivalente em supa_actual/. Publique os arquivos da pasta que corresponde à raiz atualmente servida pelo site. Não faça upload do ZIP como um único arquivo e não publique a pasta errada dentro de outra pasta. Substitua pelo menos index.html, sw.js, app.js, style.css e os demais arquivos estáticos no mesmo diretório de publicação.
+
+VERIFICAÇÃO:
+Após publicar, abra o endereço público do site no Chrome e acesse /sw.js?v=6.30.3. O conteúdo deve começar com BUILD_VERSION = "6.30.3". Abra também o endereço principal e confirme V6.30.3. Se esses dois endpoints continuarem antigos, o problema é a publicação/rota do servidor, não o cache do tablet.
+
+Não desinstale o PWA nem use limpar dados.
