@@ -1,0 +1,12 @@
+FISCALIZA DOCENTE V6.28.0 — RELATÓRIOS COMPLETOS E SEM DUPLICAÇÃO
+
+Alterações desta versão:
+- Relatórios mensal e diário passam a incluir todas as situações registradas, inclusive “Presente”, em vez de excluir as presenças do mensal.
+- Resumo completo por registro com data, horário previsto da aula, horário fiscalizado, horário real de início/fim, professor escalado, professor presente, disciplina, período, sala prevista, sala fiscalizada, situação e observações.
+- Indicadores e distribuição de situações passam a usar o mesmo conjunto de registros exibidos no detalhamento.
+- Exportação CSV mensal ampliada para incluir horário fiscal, horários reais, salas previstas/fiscalizadas, professores escalado/presente, disciplina, situação e observações.
+- Deduplicação conservadora por combinação de aula/data/sala/situação/professor/horários/observações para evitar linhas idênticas sem fundir fiscalizações distintas em salas diferentes.
+- Cartões do PDF mensal identificam a ocorrência por disciplina e data; o professor aparece no campo próprio, evitando repetição desnecessária.
+- Cache do service worker atualizado para v6.28.0.
+
+Validação: node --check nos quatro arquivos de aplicação JS/MJS e nos arquivos de sincronização; teste de integridade ZIP. Não foi executado teste visual real em navegador nem teste de impressão física.

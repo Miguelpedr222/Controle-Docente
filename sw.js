@@ -1,4 +1,4 @@
-const CACHE_NAME = "fiscaliza-docente-pwa-v6-27-0-report-redesign";
+const CACHE_NAME = "fiscaliza-docente-pwa-v6-28-0-relatorio-completo";
 const APP_SHELL = [
   "./",
   "./index.html",
