@@ -124,9 +124,9 @@ async function cleanupDuplicateData(){
   const roomKey=v=>splitRooms(v).map(norm).sort().join(' + ');
   const subjectKey=v=>String(v??'').split(/\n+/).map(norm).filter(Boolean).sort().join(' / ');
   const deletedRec=await db.get('settings','deletedScheduleIds')||{key:'deletedScheduleIds',ids:[]};
-  const deleted=new Set(deletedRec.ids||[]); const schedules=await db.getAll('schedule'); const inspections=await db.getAll('inspections');
+  const deleted=new Set((deletedRec.ids||[]).map(String)); const schedules=await db.getAll('schedule'); const inspections=await db.getAll('inspections');
   const key=x=>[norm(x.date),norm(x.start),norm(x.end),roomKey(x.room)].join('|');
-  const groups=new Map(); for(const x of schedules){if(deleted.has(x.id))continue;const k=key(x);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x);}
+  const groups=new Map(); for(const x of schedules){if(deleted.has(String(x.id)))continue;const k=key(x);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x);}
   const removed=[];
   for(const group of groups.values()){
     if(group.length<2)continue;
@@ -148,7 +148,7 @@ async function deleteRound(id){
   const x=state.schedule.find(r=>String(r.id)===String(id)); if(!x){toast('Ronda não encontrada.','error');return;}
   const label=`${fmtDate(x.date)} • ${x.start||'--:--'} • ${x.room||'sala não definida'} • ${x.scheduledTeacher||'professor não informado'}`;
   if(!confirm(`Excluir definitivamente esta ronda?\n\n${label}\n\nA ronda e seus registros de fiscalização serão removidos e ela não voltará pela sincronização.`))return;
-  const rec=await db.get('settings','deletedScheduleIds')||{key:'deletedScheduleIds',ids:[]}; const ids=new Set(rec.ids||[]);ids.add(x.id); const related=await db.getAll('inspections');
+  const rec=await db.get('settings','deletedScheduleIds')||{key:'deletedScheduleIds',ids:[]}; const ids=new Set((rec.ids||[]).map(String));ids.add(String(x.id)); const related=await db.getAll('inspections');
   for(const i of related.filter(i=>String(i.scheduleId)===String(x.id)))if(i.id!=null)await db.remove('inspections',i.id); await db.remove('schedule',x.id); await db.put('settings',{key:'deletedScheduleIds',ids:[...ids]}); state.skippedRounds=state.skippedRounds.filter(k=>k!==roundKey(x));saveSkippedRounds();await reload();render();toast('Ronda excluída.');
 }
 
@@ -333,8 +333,9 @@ function escala(){
   return `${pageHead('Escala docente','Consulte a programação original e use os filtros para encontrar rapidamente uma aula.',`<input class="control" type="date" id="scaleDate" value="${state.date}"><input class="control" id="scaleSearch" value="${esc(state.search)}" placeholder="Buscar professor, sala..."><button class="btn primary" data-new-class>+ Nova aula</button>`)}<div class="table-wrap"><table class="data-table"><thead><tr><th>Horário</th><th>Sala</th><th>Período</th><th>Professor escalado</th><th>Disciplina</th><th>Situação</th><th></th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td><strong>${esc(x.start||'')}</strong><br><span class="muted">${esc(x.end||'')}</span></td><td>${esc(x.room||'—')}</td><td>${esc(x.period||'—')}</td><td><strong>${esc(x.scheduledTeacher||'—')}</strong></td><td>${esc((x.subject||'').replace(/\n/g,' • '))}</td><td>${badge(x.status)}</td><td><button class="btn primary small" data-inspect="${esc(x.id)}">Fiscalizar</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty"><strong>Nenhum registro encontrado.</strong></div></td></tr>`}</tbody></table></div>`;
 }
 function historyRows(){
+  const linkedScheduleIds=new Set(state.inspections.map(i=>String(i.scheduleId||'')).filter(Boolean));
   const merged=[
-    ...state.schedule.filter(x=>x.status||(Array.isArray(x.roomChecks)&&x.roomChecks.some(c=>c.done&&c.status))).map(x=>{
+    ...state.schedule.filter(x=>!linkedScheduleIds.has(String(x.id))&&(x.status||(Array.isArray(x.roomChecks)&&x.roomChecks.some(c=>c.done&&c.status)))).map(x=>{
       const checks=normalizeRoomChecks(x);
       const doneChecks=checks.filter(c=>c.done&&c.status);
       return {...x,date:x.date,scheduledTeacher:x.scheduledTeacher,presentTeacher:x.presentTeacher||doneChecks.map(c=>c.presentTeacher).filter(Boolean).join(' / '),plannedRoom:x.room,presentRoom:x.presentRoom||doneChecks.map(c=>c.presentRoom||c.room).filter(Boolean).join(' / '),status:x.status||(doneChecks.length===1?doneChecks[0].status:roomStatusSummary(x)),notes:x.notes||doneChecks.map(c=>c.notes).filter(Boolean).join(' • '),checkedTime:x.checkedTime||doneChecks.map(c=>c.checkedTime).filter(Boolean).join(' / '),plannedTime:`${x.start||'—'}${x.end?' – '+x.end:''}`,createdAt:x.updatedAt||x.createdAt||x.date+'T00:00:00',source:x.source||'Ronda',scheduleId:x.id,roomChecks:checks,period:x.period,subject:x.subject,recordStatus:x.recordStatus,followUpPending:x.followUpPending};
@@ -507,7 +508,7 @@ async function deleteHistory(id,inspectionId){
 
 async function saveConfig(){const responsible=$('#cfgResponsible').value.trim();await db.put('settings',{key:'app',institution:state.settings.institution||APP_META.institution,responsible});await reload();toast('Configuração salva.')}
 async function backup(){const data=await db.exportDatabase();download(`fiscaliza-docente-backup-${todayISO()}.json`,JSON.stringify(data,null,2),'application/json');toast('Backup exportado.')}
-async function restoreBackup(file){if(!file)return;try{const data=JSON.parse(await file.text());if(!confirm('Restaurar este backup substituirá os dados locais atuais. Continuar?'))return;await db.importDatabase(data);await reload();render();toast('Backup restaurado.')}catch(err){toast(err.message||'Backup inválido.','error')}}
+async function restoreBackup(file){if(!file)return;try{const data=JSON.parse(await file.text());if(data?.importMode==='merge-schedule'){const incoming=Array.isArray(data.schedule)?data.schedule:[];if(!confirm(`Adicionar ${incoming.length} aulas à Ronda sem substituir os registros atuais? As aulas já existentes serão ignoradas.`))return;const current=await db.getAll('schedule');const ids=new Set(current.map(x=>String(x.id)));const key=x=>[x.date,x.start,x.end,String(x.room||'').trim().toLowerCase(),String(x.subject||'').replace(/\s+/g,' ').trim().toLowerCase(),String(x.scheduledTeacher||'').trim().toLowerCase()].join('|');const keys=new Set(current.map(key));const additions=incoming.filter(x=>!ids.has(String(x.id))&&!keys.has(key(x)));if(additions.length)await db.bulkPut('schedule',additions);await reload();render();toast(`${additions.length} aulas adicionadas à Ronda; os registros existentes foram preservados.`);return;}if(!confirm('Restaurar este backup substituirá os dados locais atuais. Continuar?'))return;await db.importDatabase(data);await reload();render();toast('Backup restaurado.')}catch(err){toast(err.message||'Backup inválido.','error')}}
 function exportHistory(){const rows=historyRows().map(x=>({data:x.date,professor_escalado:x.scheduledTeacher||x.assignedName,professor_presente:x.presentTeacher,situacao:x.status,disciplina:String(x.subject||'').replace(/\n/g,' / '),periodo:x.period||'',sala_prevista:x.plannedRoom||x.room,sala_fiscalizada:x.presentRoom,horario_aula:x.plannedTime||[x.start,x.end].filter(Boolean).join(' - '),horario_fiscalizado:x.checkedTime,observacoes:x.notes,origem:x.source,registro_atualizado:x.updatedAt||x.createdAt}));const headers=Object.keys(rows[0]||{data:'',professor_escalado:'',professor_presente:'',situacao:'',disciplina:'',periodo:'',sala_prevista:'',sala_fiscalizada:'',horario_aula:'',horario_fiscalizado:'',observacoes:'',origem:'',registro_atualizado:''});download('historico-fiscalizacao.csv','\ufeff'+[headers.join(';'),...rows.map(r=>headers.map(k=>'"'+String(r[k]??'').replaceAll('"','""')+'"').join(';'))].join('\n'),'text/csv;charset=utf-8')}
 function fmtMonth(v){return v?new Date(v+'-01T00:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}):'—'}
 function generateDailyPdf(){

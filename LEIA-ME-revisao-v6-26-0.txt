@@ -1,0 +1,10 @@
+Fiscaliza Docente v6.26.0 — correção de exclusão e histórico
+
+Correções implementadas no código:
+- Exclusões da Ronda ficam registradas em deletedScheduleIds (tombstones).
+- Na sincronização, os IDs excluídos são removidos da tabela fiscaliza_records do usuário autenticado antes de enviar/recuperar dados.
+- Fiscalizações ligadas a rondas excluídas não são reenviadas nem recuperadas.
+- A lista do Histórico deixa de gerar uma linha-resumo da escala quando já existem registros de fiscalização vinculados àquela aula, reduzindo duplicação.
+- Versão de cache PWA atualizada.
+
+Importante: mantenha um backup. A sincronização depende das permissões RLS e da estrutura Supabase já configuradas; teste com uma conta autenticada. Não foi possível testar contra o Supabase real nesta edição.

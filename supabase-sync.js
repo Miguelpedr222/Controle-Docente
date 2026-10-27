@@ -33,6 +33,10 @@ async function listCloud(s, type){
   const q=`/rest/v1/fiscaliza_records?select=record_type,record_key,payload&user_id=eq.${encodeURIComponent(s.user.id)}&record_type=eq.${encodeURIComponent(type)}&limit=5000`;
   return await request(q,{method:'GET'},s.access_token) || [];
 }
+async function deleteCloudRecord(s,type,key){
+  const filter=`/rest/v1/fiscaliza_records?user_id=eq.${encodeURIComponent(s.user.id)}&record_type=eq.${encodeURIComponent(type)}&record_key=eq.${encodeURIComponent(String(key))}`;
+  await request(filter,{method:'DELETE',headers:{Prefer:'return=minimal'}},s.access_token);
+}
 async function pushRows(s,type,rows,keyFn){
   const out=[];
   for(let i=0;i<rows.length;i+=100){
@@ -45,21 +49,35 @@ async function pushRows(s,type,rows,keyFn){
 }
 export async function syncDatabase(db){
   const s=await validSession();
-  const [schedule,inspections,settings]=await Promise.all([db.getAll('schedule'),db.getAll('inspections'),db.getAll('settings')]);
-  // Upload local state first. Existing local records are authoritative on key conflicts.
+  const [allSchedule,allInspections,settings]=await Promise.all([db.getAll('schedule'),db.getAll('inspections'),db.getAll('settings')]);
+  const deletedRec=settings.find(x=>x.key==='deletedScheduleIds')||{ids:[]};
+  const deletedIds=new Set((deletedRec.ids||[]).map(String));
+  // Tombstones are authoritative: delete the cloud copy and linked inspections before any upload/pull.
+  const cloudScheduleBefore=await listCloud(s,'schedule');
+  const cloudInspectionsBefore=await listCloud(s,'inspections');
+  const cloudDeletedIds=new Set();
+  for(const id of deletedIds){
+    await deleteCloudRecord(s,'schedule',id);
+    for(const row of cloudInspectionsBefore){
+      if(String(row.payload?.scheduleId||'')===id){await deleteCloudRecord(s,'inspections',row.record_key);cloudDeletedIds.add(String(row.record_key));}
+    }
+  }
+  const schedule=allSchedule.filter(x=>!deletedIds.has(String(x.id)));
+  const inspections=allInspections.filter(x=>!deletedIds.has(String(x.scheduleId||'')));
   const uploaded = await Promise.all([
     pushRows(s,'schedule',schedule,x=>String(x.id)),
     pushRows(s,'inspections',inspections,x=>String(x.id)),
     pushRows(s,'settings',settings,x=>String(x.key))
   ]);
-  // Pull only records missing locally, never overwrite local data during a sync.
   const [cloudSchedule,cloudInspections,cloudSettings]=await Promise.all([listCloud(s,'schedule'),listCloud(s,'inspections'),listCloud(s,'settings')]);
   const localSchedule=new Set(schedule.map(x=>String(x.id)));
   const localInspections=new Set(inspections.map(x=>String(x.id)));
   const localSettings=new Set(settings.map(x=>String(x.key)));
+  const cloudDeletedInspectionKeys=new Set(cloudInspections.filter(r=>deletedIds.has(String(r.payload?.scheduleId||''))).map(r=>String(r.record_key)));
+  for(const key of cloudDeletedInspectionKeys) await deleteCloudRecord(s,'inspections',key);
   let downloaded=0;
-  for(const r of cloudSchedule){if(!localSchedule.has(String(r.record_key)) && r.payload){await db.put('schedule',r.payload);localSchedule.add(String(r.record_key));downloaded++;}}
-  for(const r of cloudInspections){if(!localInspections.has(String(r.record_key)) && r.payload){const payload={...r.payload}; const id=Number(r.record_key); if(Number.isSafeInteger(id)&&id>0) payload.id=id; await db.put('inspections',payload);localInspections.add(String(r.record_key));downloaded++;}}
-  for(const r of cloudSettings){if(!localSettings.has(String(r.record_key)) && r.payload){await db.put('settings',r.payload);localSettings.add(String(r.record_key));downloaded++;}}
+  for(const r of cloudSchedule){if(!deletedIds.has(String(r.record_key))&&!localSchedule.has(String(r.record_key))&&r.payload){await db.put('schedule',r.payload);localSchedule.add(String(r.record_key));downloaded++;}}
+  for(const r of cloudInspections){if(!deletedIds.has(String(r.payload?.scheduleId||''))&&!cloudDeletedInspectionKeys.has(String(r.record_key))&&!localInspections.has(String(r.record_key))&&r.payload){const payload={...r.payload};const id=Number(r.record_key);if(Number.isSafeInteger(id)&&id>0)payload.id=id;await db.put('inspections',payload);localInspections.add(String(r.record_key));downloaded++;}}
+  for(const r of cloudSettings){if(!localSettings.has(String(r.record_key))&&r.payload){await db.put('settings',r.payload);localSettings.add(String(r.record_key));downloaded++;}}
   return {uploaded:uploaded.reduce((a,b)=>a+b,0),downloaded,email:s.user.email};
 }
