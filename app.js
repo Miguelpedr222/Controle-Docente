@@ -24,11 +24,14 @@ document.addEventListener('DOMContentLoaded',async()=>{
     bindNavigation();
     const rebuildMarker=await db.get('settings','workbookRebuildV6131');
     if(rebuildMarker?.done!==true){
-      // Importação completa V6.13.1: substitui escala e histórico locais uma única vez pela planilha atualizada.
-      await db.clearStore('schedule'); await db.clearStore('inspections');
-      await db.bulkPut('schedule', INITIAL_DATA.schedule.map(x=>({...x, roomChecks: normalizeRoomChecks(x)})));
-      for (const item of INITIAL_DATA.inspections) { const copy = {...item, source: item.source || 'Planilha de Controle Docente', imported: true}; delete copy.id; await db.add('inspections', copy); }
-      await db.put('settings',{key:'workbookRebuildV6131',done:true,at:new Date().toISOString(),scheduleCount:INITIAL_DATA.schedule.length,inspectionCount:INITIAL_DATA.inspections.length});
+      // Importação inicial segura: nunca apaga escala/histórico existentes durante uma atualização.
+      const existingSchedule=await db.getAll('schedule');
+      const existingInspections=await db.getAll('inspections');
+      if(existingSchedule.length===0 && existingInspections.length===0){
+        await db.bulkPut('schedule', INITIAL_DATA.schedule.map(x=>({...x, roomChecks: normalizeRoomChecks(x)})));
+        for (const item of INITIAL_DATA.inspections) { const copy = {...item, source: item.source || 'Planilha de Controle Docente', imported: true}; delete copy.id; await db.add('inspections', copy); }
+      }
+      await db.put('settings',{key:'workbookRebuildV6131',done:true,at:new Date().toISOString(),scheduleCount:INITIAL_DATA.schedule.length,inspectionCount:INITIAL_DATA.inspections.length,preservedExistingData:existingSchedule.length>0||existingInspections.length>0});
     }
     await db.seedIfEmpty(INITIAL_DATA);
     await syncScheduleMetadata();

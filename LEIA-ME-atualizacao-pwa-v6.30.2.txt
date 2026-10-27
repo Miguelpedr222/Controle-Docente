@@ -1,0 +1,15 @@
+Fiscaliza Docente v6.30.2 — Correção de atualização do PWA
+
+Correções desta versão:
+- Service Worker atualizado para buscar HTML, JavaScript e CSS primeiro na rede, usando o cache apenas como fallback offline.
+- Registro do Service Worker configurado com updateViaCache: "none" e verificação explícita de atualização.
+- URLs do HTML, CSS e app.js receberam identificador de versão para evitar reutilização de recursos antigos pelo cache HTTP.
+- A ativação remove apenas caches antigos com prefixo do Fiscaliza Docente, sem tocar no IndexedDB nem nos dados do Supabase.
+- Requisições externas, incluindo APIs do Supabase, não são interceptadas nem armazenadas no cache do PWA.
+- Mantidas as melhorias de relatórios em cards e os horários da versão 6.30.1.
+
+Publicação:
+Substitua os arquivos do aplicativo no mesmo diretório/serviço que hospeda a versão atual, incluindo index.html, app.js, style.css e sw.js. Não altere tabelas, buckets ou credenciais do Supabase. Depois, abra o endereço no Chrome do tablet para confirmar a versão V6.30.2; em seguida, abra o ícone instalado.
+
+Segurança dos dados:
+A atualização do cache não apaga o IndexedDB nem o banco do Supabase. Não desinstale o PWA nem use “limpar dados” como parte desta atualização.
