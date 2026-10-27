@@ -1,0 +1,10 @@
+FISCALIZA DOCENTE V6.29.0 — REVISÃO REAL DOS RELATÓRIOS
+
+Correções aplicadas após revisar a versão 6.28.0:
+- PDF mensal reconstruído em formato de tabela horizontal, com todos os campos de cada fiscalização numa única linha: data/dia, horário da aula, horário fiscal, professor escalado, professor presente, disciplina, período, sala prevista, sala fiscalizada, situação e observações.
+- Resumo quantitativo e distribuição de situações usam exatamente a mesma coleção de registros detalhados.
+- A seção mensal na tela fica aberta por padrão e a prévia não corta a lista em 100 registros.
+- Deduplicação baseada no conteúdo do registro e na sala/horários, não no ID isolado; registros de salas diferentes ou horários diferentes permanecem separados.
+- Cache do service worker atualizado para v6.29.0.
+
+Validação: sintaxe JS/MJS e integridade do ZIP. Não foi possível executar navegador real/serviço Supabase nesta sessão.
