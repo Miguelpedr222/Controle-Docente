@@ -1,0 +1,11 @@
+Fiscaliza Docente v6.32.0 — Relatório diário em cards
+
+Alterações desta versão:
+- Mantém o relatório mensal completo em cards da versão anterior.
+- Troca a tabela horizontal do relatório diário por cartões responsivos, mais fáceis de ler em computador e tablet.
+- Cada cartão separa visualmente horário da aula, horário real quando informado, situação, disciplina/período, professor escalado, professor presente, sala prevista, sala fiscalizada, horário da fiscalização e observações.
+- Atrasos/possíveis atrasos recebem destaque visual para revisão.
+- Busca, filtros por situação, filtro de atrasos, exportação CSV e PDF diário continuam disponíveis.
+- Atualiza os parâmetros de cache/PWA para v6.32.0. Não limpa IndexedDB, localStorage ou dados do Supabase.
+
+Publicação: substitua os arquivos publicados pelos arquivos da raiz deste pacote. Não envie o ZIP como um único arquivo e não publique apenas a pasta supa_actual. Depois de publicar, confira se sw.js contém BUILD_VERSION = "6.32.0".

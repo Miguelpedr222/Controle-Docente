@@ -12,7 +12,7 @@
   <link rel="icon" href="./icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <title>Fiscaliza Docente • UNIG</title>
-  <link rel="stylesheet" href="./style.css?v=6.30.3">
+  <link rel="stylesheet" href="./style.css?v=6.32.0">
 </head>
 <body>
   <div class="app" id="appShell">
@@ -40,7 +40,7 @@
       </nav>
       <div class="sidebar-bottom">
         <div class="local-status"><span></span><div><strong>Modo local</strong><small>Dados neste dispositivo</small></div></div>
-        <div class="sidebar-version">Fiscaliza Docente V6.30.3</div>
+        <div class="sidebar-version">Fiscaliza Docente V6.32.0</div>
       </div>
     </aside>
 
@@ -116,11 +116,11 @@
 
   <datalist id="teacherList"></datalist>
 
-  <script type="module" src="./app.js?v=6.30.3"></script>
+  <script type="module" src="./app.js?v=6.32.0"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js?v=6.30.3", { scope: "./", updateViaCache: "none" })
+        navigator.serviceWorker.register("./sw.js?v=6.32.0", { scope: "./", updateViaCache: "none" })
           .then(async reg => {
             // Force a network validation on each open; do not clear local application data.
             try { await reg.update(); } catch (err) { console.warn("PWA: falha ao verificar atualização", err); }

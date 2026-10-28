@@ -1,0 +1,22 @@
+FISCALIZA DOCENTE — VERSÃO 6.31.0
+
+O que foi reconstruído
+- Mecanismo de atualização do PWA refeito para priorizar sempre a versão publicada no servidor (network-first).
+- O Service Worker não intercepta requisições externas/Supabase.
+- A limpeza do cache fica limitada aos caches próprios do app; não apaga IndexedDB, localStorage nem dados do Supabase.
+- index.html, style.css, app.js e sw.js usam identificador de versão novo.
+- A pasta raiz e a pasta supa_actual contêm os mesmos arquivos de publicação.
+
+IMPORTANTE
+Este ZIP não consegue alterar sozinho o site já hospedado. É necessário extrair e publicar os arquivos na pasta EXATA que serve o endereço usado pelo tablet, substituindo os arquivos antigos. Não envie o ZIP como arquivo único e não coloque uma pasta dentro de outra por engano.
+
+TESTE OBRIGATÓRIO APÓS PUBLICAR
+1. Abra o endereço do sistema no Chrome do computador.
+2. Abra o mesmo domínio seguido de /sw.js?v=6.31.0. O texto deve conter BUILD_VERSION = "6.31.0".
+3. Abra o endereço principal e confirme a versão 6.31.0.
+4. Só depois abra o PWA no tablet com internet.
+
+Se o passo 2 ainda mostrar código antigo/erro 404, o site está servindo outra pasta/domínio ou o upload não foi feito no destino correto. Nenhum código dentro do ZIP consegue corrigir isso sem publicar no servidor certo.
+
+Dados
+O código do app e a configuração existente do Supabase foram preservados. Não compartilhe chaves secretas ou senhas.
